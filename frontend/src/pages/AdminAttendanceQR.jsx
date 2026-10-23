@@ -1,0 +1,8 @@
+import { useMemo } from "react";
+import AdminLayout from "../components/AdminLayout";
+
+export default function AdminAttendanceQR() {
+  const attendanceUrl = useMemo(() => typeof window === "undefined" ? "" : `${window.location.origin}/student/attendance`, []);
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&format=png&data=${encodeURIComponent(attendanceUrl)}`;
+  return <AdminLayout title="Student Attendance QR"><div className="mx-auto max-w-3xl space-y-6"><header className="rounded-2xl bg-gradient-to-r from-sky-800 to-sky-600 p-6 text-white"><h1 className="text-2xl font-bold">Student Attendance QR</h1><p className="mt-2 text-sky-100">Display this QR at the campus entrance. Students scan it to open the student attendance page.</p></header><section className="flex flex-col items-center rounded-2xl border bg-white p-6 text-center shadow-sm"><div className="rounded-2xl border bg-white p-5"><img src={qrImageUrl} alt="QR code for student attendance" width="280" height="280" className="h-[280px] w-[280px]" /></div><h2 className="mt-5 text-lg font-bold text-gray-800">Scan to open attendance</h2><p className="mt-2 max-w-lg break-all text-sm text-gray-500">{attendanceUrl}</p><button onClick={() => window.print()} className="mt-5 rounded-xl bg-sky-700 px-5 py-3 font-semibold text-white">Print QR</button><p className="mt-4 max-w-lg text-xs text-amber-700">The QR opens the attendance page; it does not mark attendance automatically. Students must log in and tap the attendance button. For phones on campus, open the website using a reachable LAN address or deployed HTTPS URL, not localhost.</p></section></div></AdminLayout>;
+}
