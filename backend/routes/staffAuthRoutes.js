@@ -2,7 +2,9 @@
 const express = require("express");
 const router = express.Router();
 
-const { staffLogin } = require("../controllers/staffAuthController");
+const {
+  staffLogin,
+} = require("../controllers/staffAuthController");
 
 router.post("/login", staffLogin);
 

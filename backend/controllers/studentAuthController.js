@@ -6,22 +6,18 @@ const Student = require("../models/Student");
 
 const studentLogin = async (req, res) => {
   try {
-    const { identifier, password } = req.body;
+    const identifier = String(req.body.identifier || "").trim();
+    const password = String(req.body.password || "");
 
-    if (
-      typeof identifier !== "string" ||
-      typeof password !== "string" ||
-      !identifier.trim() ||
-      !password
-    ) {
+    if (!identifier || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please enter your name or CNIC and password.",
+        message: "Please enter your student name/CNIC and password.",
       });
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is missing.");
+      console.error("JWT_SECRET is missing from backend .env");
 
       return res.status(500).json({
         success: false,
@@ -29,13 +25,11 @@ const studentLogin = async (req, res) => {
       });
     }
 
-    const loginValue = identifier.trim();
-
-    const student = await Student.findOne({
+    const student = await Student.unscoped().findOne({
       where: {
         [Op.or]: [
-          { name: loginValue },
-          { cnic: loginValue },
+          { name: identifier },
+          { cnic: identifier },
         ],
       },
     });
@@ -43,60 +37,46 @@ const studentLogin = async (req, res) => {
     if (!student) {
       return res.status(401).json({
         success: false,
-        message: "Invalid name/CNIC or password.",
+        message: "Invalid student credentials.",
       });
     }
 
-    if (student.status !== "Active") {
-      return res.status(403).json({
-        success: false,
-        message: "Your account is inactive. Contact the institute.",
-      });
-    }
+    const storedHash =
+      student.passwordHash || student.password_hash;
 
-    if (!student.passwordHash) {
+    if (!storedHash) {
       return res.status(401).json({
         success: false,
-        message: "Password is not configured. Contact the institute.",
+        message: "Student password is not configured.",
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(
+    const passwordMatches = await bcrypt.compare(
       password,
-      student.passwordHash
+      storedHash
     );
 
-    if (!isPasswordValid) {
+    if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message: "Invalid name/CNIC or password.",
+        message: "Invalid student credentials.",
       });
     }
 
     const token = jwt.sign(
       {
         id: student.id,
+        studentId: student.id,
         role: "student",
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "8h" }
     );
 
-    const studentData = {
-      id: student.id,
-      name: student.name,
-      fatherName: student.fatherName,
-      cnic: student.cnic,
-      email: student.email,
-      phone: student.phone,
-      gender: student.gender,
-      course: student.course,
-      qualification: student.qualification,
-      domicile: student.domicile,
-      address: student.address,
-      image: student.image,
-      status: student.status,
-    };
+    const studentData = student.toJSON();
+    delete studentData.passwordHash;
+    delete studentData.password_hash;
+    delete studentData.password;
 
     return res.status(200).json({
       success: true,
@@ -105,11 +85,11 @@ const studentLogin = async (req, res) => {
       student: studentData,
     });
   } catch (error) {
-    console.error("Student Login Error:", error);
+    console.error("studentLogin error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "An internal server error occurred.",
+      message: "Student login failed. Please check the server logs.",
     });
   }
 };

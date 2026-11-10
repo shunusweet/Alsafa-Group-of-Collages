@@ -1,371 +1,282 @@
-const { sequelize } = require("../config/database");
+const { Op } = require("sequelize");
 
-const Student = require("../models/Student");
 const Fee = require("../models/Fee");
 const FeePayment = require("../models/FeePayment");
+const Student = require("../models/Student");
 
 // ==========================================
-// HELPER: GET FEE ACCOUNT WITH RELATIONS
+// GET ALL FEES
 // ==========================================
+exports.getFees = async (req, res) => {
+  try {
+    const fees = await Fee.findAll({
+      order: [["createdAt", "DESC"]],
+    });
 
-const getFeeIncludes = () => [
-    {
-        model: Student,
-        as: "student",
-        attributes: [
-            "id",
-            "name",
-            "fatherName",
-            "course"
-        ]
-    },
-    {
-        model: FeePayment,
-        as: "payments"
-    }
-];
+    const result = await Promise.all(
+      fees.map(async (fee) => {
+        const student = await Student.findByPk(fee.studentId);
 
-// ==========================================
-// GET ALL FEE ACCOUNTS
-// ==========================================
-
-const getFees = async (req, res) => {
-    try {
-        const fees = await Fee.findAll({
-            include: getFeeIncludes(),
-            order: [
-                ["createdAt", "DESC"]
-            ]
+        const payments = await FeePayment.findAll({
+          where: { feeId: fee.id },
+          order: [["month", "ASC"]],
         });
 
-        return res.status(200).json({
-            success: true,
-            count: fees.length,
-            fees
-        });
-    } catch (error) {
-        console.error("Get Fees Error:", error);
+        return {
+          ...fee.toJSON(),
+          student,
+          payments,
+        };
+      })
+    );
 
-        return res.status(500).json({
-            success: false,
-            message:
-                error.message ||
-                "Failed to fetch fees."
-        });
-    }
+    return res.status(200).json({
+      success: true,
+      fees: result,
+    });
+  } catch (error) {
+    console.error("Get Fees Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load fee records.",
+    });
+  }
 };
 
 // ==========================================
-// ADD A MONTHLY PAYMENT
+// ADD FEE / RECORD PAYMENT
 // ==========================================
+exports.addFeePayment = async (req, res) => {
+  const transaction = await Fee.sequelize.transaction();
 
-const addFeePayment = async (req, res) => {
-    let transaction;
+  try {
+    const {
+      studentId,
+      totalFee,
+      monthlyFee,
+      month,
+      amountPaid,
+      remarks,
+    } = req.body;
 
-    try {
-        const {
-            studentId,
-            totalFee,
-            month,
-            amountPaid,
-            remarks
-        } = req.body;
+    if (!studentId || !month || !amountPaid) {
+      await transaction.rollback();
 
-        const studentID = Number(studentId);
-        const paymentAmount = Number(amountPaid);
-
-        // Validate required fields
-        if (
-            !Number.isInteger(studentID) ||
-            studentID <= 0
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Please select a valid student."
-            });
-        }
-
-        if (
-            !month ||
-            !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Please select a valid payment month."
-            });
-        }
-
-        if (
-            !Number.isFinite(paymentAmount) ||
-            paymentAmount <= 0
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Payment amount must be greater than zero."
-            });
-        }
-
-        transaction = await sequelize.transaction();
-
-        // Check student
-        const student = await Student.findByPk(
-            studentID,
-            { transaction }
-        );
-
-        if (!student) {
-            const error = new Error("Student not found.");
-            error.statusCode = 404;
-            throw error;
-        }
-
-        // Find or create the student's fee account
-        let fee = await Fee.findOne({
-            where: {
-                studentId: studentID
-            },
-            transaction
-        });
-
-        if (!fee) {
-            const firstTotalFee = Number(totalFee);
-
-            if (
-                !Number.isFinite(firstTotalFee) ||
-                firstTotalFee <= 0
-            ) {
-                const error = new Error(
-                    "Please enter the student's total fee."
-                );
-
-                error.statusCode = 400;
-                throw error;
-            }
-
-            fee = await Fee.create(
-                {
-                    studentId: studentID,
-                    totalFee: firstTotalFee
-                },
-                { transaction }
-            );
-        }
-
-        // Calculate payments already received
-        const previousPayments =
-            await FeePayment.sum("amountPaid", {
-                where: {
-                    feeId: fee.id
-                },
-                transaction
-            });
-
-        const totalPaid = Number(
-            previousPayments || 0
-        );
-
-        const savedTotalFee = Number(
-            fee.totalFee
-        );
-
-        const remainingBalance = Math.max(
-            0,
-            savedTotalFee - totalPaid
-        );
-
-        if (remainingBalance <= 0) {
-            const error = new Error(
-                "This student's fees are already cleared."
-            );
-
-            error.statusCode = 400;
-            throw error;
-        }
-
-        // Prevent overpayment
-        if (
-            paymentAmount >
-            remainingBalance + 0.001
-        ) {
-            const error = new Error(
-                `Payment exceeds the remaining balance of ${remainingBalance.toFixed(2)}.`
-            );
-
-            error.statusCode = 400;
-            throw error;
-        }
-
-        // Save this month's payment
-        await FeePayment.create(
-            {
-                feeId: fee.id,
-                month,
-                amountPaid: paymentAmount,
-                remarks: remarks
-                    ? String(remarks).trim()
-                    : null
-            },
-            { transaction }
-        );
-
-        await transaction.commit();
-
-        const updatedFee = await Fee.findByPk(
-            fee.id,
-            {
-                include: getFeeIncludes()
-            }
-        );
-
-        return res.status(201).json({
-            success: true,
-            message: "Fee payment saved successfully.",
-            fee: updatedFee
-        });
-    } catch (error) {
-        if (
-            transaction &&
-            !transaction.finished
-        ) {
-            await transaction.rollback();
-        }
-
-        console.error("Add Fee Payment Error:", error);
-
-        return res.status(
-            error.statusCode || 500
-        ).json({
-            success: false,
-            message:
-                error.message ||
-                "Failed to save fee payment."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Student, month and payment amount are required.",
+      });
     }
+
+    const total = Number(totalFee);
+    const monthly = Number(monthlyFee);
+    const paidAmount = Number(amountPaid);
+
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount must be greater than zero.",
+      });
+    }
+
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment month.",
+      });
+    }
+
+    if (monthlyFee !== undefined && (!Number.isFinite(monthly) || monthly < 0)) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Monthly fee must be a valid non-negative amount.",
+      });
+    }
+
+    const student = await Student.findByPk(studentId, { transaction });
+
+    if (!student) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Student not found.",
+      });
+    }
+
+    let fee = await Fee.findOne({
+      where: { studentId },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!fee) {
+      if (!Number.isFinite(total) || total <= 0) {
+        await transaction.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid total fee.",
+        });
+      }
+
+      fee = await Fee.create(
+        {
+          studentId,
+          totalFee: total,
+          monthlyFee: monthly || 0,
+        },
+        { transaction }
+      );
+    } else {
+      if (monthlyFee !== undefined) {
+        await fee.update(
+          { monthlyFee: monthly },
+          { transaction }
+        );
+      }
+    }
+
+    const payments = await FeePayment.findAll({
+      where: { feeId: fee.id },
+      transaction,
+    });
+
+    const alreadyPaid = payments.reduce(
+      (sum, payment) => sum + Number(payment.amountPaid || 0),
+      0
+    );
+
+    const remaining = Math.max(
+      0,
+      Number(fee.totalFee) - alreadyPaid
+    );
+
+    if (paidAmount > remaining + 0.001) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: `Payment cannot exceed remaining balance of Rs ${remaining.toFixed(2)}.`,
+      });
+    }
+
+    await FeePayment.create(
+      {
+        feeId: fee.id,
+        month,
+        amountPaid: paidAmount,
+        remarks: remarks || "",
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: "Fee payment saved successfully.",
+    });
+  } catch (error) {
+    await transaction.rollback();
+
+    console.error("Add Fee Payment Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to save fee payment.",
+    });
+  }
 };
 
 // ==========================================
 // CLEAR REMAINING FEES
 // ==========================================
+exports.clearFees = async (req, res) => {
+  const transaction = await Fee.sequelize.transaction();
 
-const clearFees = async (req, res) => {
-    let transaction;
+  try {
+    const { id } = req.params;
+    const { month } = req.body;
 
-    try {
-        const { id } = req.params;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      await transaction.rollback();
 
-        const month =
-            req.body.month ||
-            (() => {
-                const now = new Date();
-
-                return (
-                    now.getFullYear() +
-                    "-" +
-                    String(
-                        now.getMonth() + 1
-                    ).padStart(2, "0")
-                );
-            })();
-
-        if (
-            !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid payment month."
-            });
-        }
-
-        transaction = await sequelize.transaction();
-
-        const fee = await Fee.findByPk(id, {
-            transaction
-        });
-
-        if (!fee) {
-            const error = new Error(
-                "Fee account not found."
-            );
-
-            error.statusCode = 404;
-            throw error;
-        }
-
-        const previousPayments =
-            await FeePayment.sum("amountPaid", {
-                where: {
-                    feeId: fee.id
-                },
-                transaction
-            });
-
-        const totalPaid = Number(
-            previousPayments || 0
-        );
-
-        const remainingBalance = Math.max(
-            0,
-            Number(fee.totalFee) - totalPaid
-        );
-
-        if (remainingBalance <= 0) {
-            const error = new Error(
-                "These fees are already cleared."
-            );
-
-            error.statusCode = 400;
-            throw error;
-        }
-
-        // Record the final payment instead of
-        // simply changing a status flag.
-        await FeePayment.create(
-            {
-                feeId: fee.id,
-                month,
-                amountPaid: remainingBalance,
-                remarks: "Remaining fees cleared"
-            },
-            { transaction }
-        );
-
-        await transaction.commit();
-
-        const updatedFee = await Fee.findByPk(
-            fee.id,
-            {
-                include: getFeeIncludes()
-            }
-        );
-
-        return res.status(200).json({
-            success: true,
-            message: "All remaining fees have been cleared.",
-            fee: updatedFee
-        });
-    } catch (error) {
-        if (
-            transaction &&
-            !transaction.finished
-        ) {
-            await transaction.rollback();
-        }
-
-        console.error("Clear Fees Error:", error);
-
-        return res.status(
-            error.statusCode || 500
-        ).json({
-            success: false,
-            message:
-                error.message ||
-                "Failed to clear fees."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid payment month.",
+      });
     }
-};
 
-module.exports = {
-    getFees,
-    addFeePayment,
-    clearFees
+    const fee = await Fee.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+
+    if (!fee) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Fee account not found.",
+      });
+    }
+
+    const payments = await FeePayment.findAll({
+      where: { feeId: fee.id },
+      transaction,
+    });
+
+    const paid = payments.reduce(
+      (sum, payment) => sum + Number(payment.amountPaid || 0),
+      0
+    );
+
+    const balance = Math.max(
+      0,
+      Number(fee.totalFee) - paid
+    );
+
+    if (balance <= 0) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "This fee account is already cleared.",
+      });
+    }
+
+    await FeePayment.create(
+      {
+        feeId: fee.id,
+        month,
+        amountPaid: balance,
+        remarks: "Remaining fee cleared.",
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Remaining fees cleared successfully.",
+    });
+  } catch (error) {
+    await transaction.rollback();
+
+    console.error("Clear Fees Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to clear fees.",
+    });
+  }
 };

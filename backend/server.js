@@ -20,8 +20,7 @@ const Staff = require("./models/Staff");
 const Fee = require("./models/Fee");
 const FeePayment = require("./models/FeePayment");
 const Attendance = require("./models/Attendance");
-const staffAuthRoutes = require("./routes/staffAuthRoutes");
-const staffPortalRoutes = require("./routes/staffPortalRoutes");
+const StaffAttendance = require("./models/StaffAttendance");
 
 // ==========================================
 // ROUTES
@@ -35,12 +34,16 @@ const staffRoutes = require("./routes/staffRoutes");
 const feeRoutes = require("./routes/feeRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 
+const staffAuthRoutes = require("./routes/staffAuthRoutes");
+const staffPortalRoutes = require("./routes/staffPortalRoutes");
+const staffAttendanceRoutes = require("./routes/staffAttendanceRoutes");
+
 // ==========================================
 // DATABASE RELATIONSHIPS
-// Define associations BEFORE sequelize.sync()
+// Define associations before sequelize.sync()
 // ==========================================
 
-// One student has one fee account.
+// Student <-> Fee
 if (!Student.associations.feeAccount) {
   Student.hasOne(Fee, {
     foreignKey: "studentId",
@@ -55,7 +58,7 @@ if (!Fee.associations.student) {
   });
 }
 
-// One fee account has many payments.
+// Fee <-> FeePayment
 if (!Fee.associations.payments) {
   Fee.hasMany(FeePayment, {
     foreignKey: "feeId",
@@ -71,7 +74,7 @@ if (!FeePayment.associations.fee) {
   });
 }
 
-// One student has many attendance records.
+// Student <-> Attendance
 if (!Student.associations.attendanceRecords) {
   Student.hasMany(Attendance, {
     foreignKey: "studentId",
@@ -80,12 +83,25 @@ if (!Student.associations.attendanceRecords) {
   });
 }
 
-// Each attendance record belongs to one student.
-// The alias "student" is used by the attendance controller.
 if (!Attendance.associations.student) {
   Attendance.belongsTo(Student, {
     foreignKey: "studentId",
     as: "student",
+  });
+}
+
+// Staff <-> StaffAttendance
+if (!Staff.associations.attendanceRecords) {
+  Staff.hasMany(StaffAttendance, {
+    foreignKey: "staffId",
+    as: "attendanceRecords",
+  });
+}
+
+if (!StaffAttendance.associations.staff) {
+  StaffAttendance.belongsTo(Staff, {
+    foreignKey: "staffId",
+    as: "staff",
   });
 }
 
@@ -134,6 +150,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/student-auth", studentAuthRoutes);
+app.use("/api/staff-auth", staffAuthRoutes);
 
 // ==========================================
 // STUDENT MANAGEMENT
@@ -152,6 +169,7 @@ app.use("/api/courses", courseRoutes);
 // ==========================================
 
 app.use("/api/staff", staffRoutes);
+app.use("/api/staff-portal", staffPortalRoutes);
 
 // ==========================================
 // FEES MANAGEMENT
@@ -163,12 +181,11 @@ app.use("/api/fees", feeRoutes);
 // ATTENDANCE MANAGEMENT
 // ==========================================
 
+// Existing student attendance routes
 app.use("/api/attendance", attendanceRoutes);
 
-
-app.use("/api/staff-auth", staffAuthRoutes);
-app.use("/api/staff-portal", staffPortalRoutes);
-
+// Staff attendance routes
+app.use("/api/staff-attendance", staffAttendanceRoutes);
 
 // ==========================================
 // 404 NOT FOUND
@@ -211,16 +228,16 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
-    // 1. Connect to MySQL.
+    // 1. Connect to MySQL
     await connectDB();
 
-    // 2. Register and synchronize all imported models.
-    // Creates missing tables; does not force-drop existing tables.
+    // 2. Synchronize registered models and associations
+    // This does not force-drop existing tables.
     await sequelize.sync();
 
     console.log("Database Tables Ready!");
 
-    // 3. Start the API server.
+    // 3. Start API server
     app.listen(PORT, () => {
       console.log("----------------------------------");
       console.log("Student Management System");
@@ -233,8 +250,11 @@ const startServer = async () => {
       console.log(`Students API: http://localhost:${PORT}/api/students`);
       console.log(`Courses API: http://localhost:${PORT}/api/courses`);
       console.log(`Staff API: http://localhost:${PORT}/api/staff`);
+      console.log(`Staff Auth: http://localhost:${PORT}/api/staff-auth`);
+      console.log(`Staff Portal: http://localhost:${PORT}/api/staff-portal`);
       console.log(`Fees API: http://localhost:${PORT}/api/fees`);
-      console.log(`Attendance API: http://localhost:${PORT}/api/attendance`);
+      console.log(`Student Attendance: http://localhost:${PORT}/api/attendance`);
+      console.log(`Staff Attendance: http://localhost:${PORT}/api/staff-attendance`);
       console.log("----------------------------------");
     });
   } catch (error) {

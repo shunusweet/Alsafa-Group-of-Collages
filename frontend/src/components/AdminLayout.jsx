@@ -1,157 +1,142 @@
 
 import { useState } from "react";
 import Sidebar from "../pages/Sidebar";
+import SvgRepoIcon from "./SvgRepoIcon";
 
 const AdminLayout = ({ children, title = "Dashboard" }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "null"
-  );
+  let user = null;
+
+  try {
+    user = JSON.parse(localStorage.getItem("user") || "null");
+  } catch {
+    user = null;
+  }
+
+  const displayName =
+    user?.name ||
+    user?.fullName ||
+    user?.username ||
+    "Administrator";
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* =====================================================
-          SIDEBAR
-      ===================================================== */}
+    <div className="min-h-screen w-full bg-[#f3f7f4] text-[#17251d]">
 
+      {/* SIDEBAR */}
       <Sidebar
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
       />
 
-      {/* =====================================================
-          MAIN AREA
-      ===================================================== */}
+      {/* MAIN CONTENT */}
+      <div className="min-h-screen w-full lg:ml-[260px] lg:w-[calc(100%-260px)]">
 
-      <div className="lg:ml-64 min-h-screen">
-        {/* =====================================================
-            TOP NAVBAR
-        ===================================================== */}
+        {/* TOP HEADER */}
+        <header className="sticky top-0 z-30 flex h-[76px] w-full items-center justify-between border-b border-[#e5eee7] bg-white/95 px-3 shadow-[0_2px_15px_rgba(23,107,77,0.04)] backdrop-blur-xl sm:px-5 md:px-7">
 
-        <nav
-          className="
-            h-[72px]
-            bg-white
-            border-b border-gray-200
-            flex items-center justify-between
-            px-4 md:px-6
-            sticky top-0
-            z-30
-            shadow-sm
-          "
-        >
-          {/* =================================================
-              LEFT SIDE
-          ================================================= */}
+          {/* LEFT SIDE */}
+          <div className="flex min-w-0 items-center gap-3">
 
-          <div className="flex items-center gap-4">
             {/* MOBILE MENU */}
-
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="
-                lg:hidden
-                w-10 h-10
-                rounded-lg
-                bg-blue-50
-                text-blue-600
-                flex items-center justify-center
-                hover:bg-blue-100
-                transition
-              "
+              aria-label="Open menu"
+              aria-expanded={sidebarOpen}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#dcebe0] bg-[#eff7f1] text-[#176b4d] transition-all duration-200 hover:bg-[#dcefe2] active:scale-95 lg:hidden"
             >
-              ☰
+              <span className="flex w-[19px] flex-col gap-[5px]">
+                <span className="h-[2px] w-full rounded-full bg-current" />
+                <span className="h-[2px] w-full rounded-full bg-current" />
+                <span className="h-[2px] w-full rounded-full bg-current" />
+              </span>
             </button>
 
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">
-                {title}
-              </h2>
+            {/* PAGE TITLE */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="hidden h-8 w-1 rounded-full bg-gradient-to-b from-[#176b4d] to-[#35a66e] sm:block" />
 
-              <p className="text-xs text-gray-400 hidden sm:block">
-                Student Management System
+                <h1 className="truncate text-base font-bold tracking-tight text-[#183b2b] sm:text-xl">
+                  {title}
+                </h1>
+              </div>
+
+              <p className="mt-1 hidden text-[11px] font-medium tracking-wide text-[#84968a] sm:block">
+                ALSAFA INSTITUTE &amp; GROUP OF COLLEGES
               </p>
             </div>
           </div>
 
-          {/* =================================================
-              RIGHT SIDE
-          ================================================= */}
+          {/* RIGHT SIDE */}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-5">
 
-          <div className="flex items-center gap-3 md:gap-4">
-            {/* NOTIFICATION */}
+            {/* SEARCH */}
+            <div className="hidden h-10 w-64 items-center gap-2 rounded-xl border border-[#e8f0e9] bg-[#f7faf7] px-3 transition-all focus-within:border-[#7cb995] focus-within:bg-white focus-within:shadow-sm md:flex">
+              <SvgRepoIcon name="search" size={18} />
 
+              <input
+                aria-label="Search records"
+                placeholder="Search records..."
+                className="w-full bg-transparent text-sm text-[#294535] outline-none placeholder:text-[#9aaa9f]"
+              />
+
+              <span className="rounded-md border border-[#e2ebe4] bg-white px-1.5 py-0.5 text-[10px] text-[#8b9b90]">
+                /
+              </span>
+            </div>
+
+            {/* NOTIFICATIONS */}
             <button
               type="button"
-              className="
-                relative
-                w-10 h-10
-                rounded-lg
-                bg-gray-50
-                hover:bg-blue-50
-                text-gray-600
-                flex items-center justify-center
-                transition
-              "
+              aria-label="Notifications"
+              className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-transparent bg-[#f3f8f4] transition-all hover:border-[#dcebe0] hover:bg-[#e6f3e9]"
             >
-              🔔
+              <SvgRepoIcon name="bell" size={19} />
 
-              <span
-                className="
-                  absolute
-                  top-1.5 right-1.5
-                  w-2 h-2
-                  bg-red-500
-                  rounded-full
-                "
-              ></span>
+              <span className="absolute right-[9px] top-[8px] h-2 w-2 rounded-full border-2 border-white bg-[#16a05d]" />
             </button>
 
-            {/* USER */}
+            {/* DIVIDER */}
+            <div className="hidden h-9 w-px bg-[#e8eee9] sm:block" />
 
-            <div className="flex items-center gap-3">
-              <div
-                className="
-                  w-10 h-10
-                  rounded-full
-                  bg-blue-600
-                  text-white
-                  flex items-center justify-center
-                "
-              >
-                👤
+            {/* USER PROFILE */}
+            <div className="flex items-center gap-2.5">
+
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#cfe5d5] bg-gradient-to-br from-[#e4f3e8] to-[#cce9d5] shadow-sm">
+                <SvgRepoIcon name="profile" size={27} />
+
+                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#16a05d]" />
               </div>
 
-              <div className="hidden sm:block">
-                <p className="text-sm font-bold text-gray-700">
-                  {user?.name || "Administrator"}
+              <div className="hidden min-w-0 sm:block">
+                <p className="max-w-36 truncate text-sm font-bold text-[#204432]">
+                  {displayName}
                 </p>
 
-                <p className="text-xs text-gray-400">
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-[#84968a]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#20a363]" />
                   Administrator
                 </p>
               </div>
 
-              <span className="text-gray-400 hidden sm:block">
-                ▼
-              </span>
             </div>
           </div>
-        </nav>
+        </header>
 
-        {/* =====================================================
-            PAGE CONTENT
-        ===================================================== */}
+        {/* PAGE CONTENT */}
+        <main className="min-h-[calc(100vh-76px)] w-full overflow-x-hidden p-3 sm:p-5 md:p-6 xl:p-7">
 
-        <main className="p-4 md:p-6 lg:p-8">
-          {children}
+          <div className="mx-auto w-full max-w-[1800px]">
+            {children}
+          </div>
+
         </main>
+
       </div>
     </div>
   );
 };
 
 export default AdminLayout;
-

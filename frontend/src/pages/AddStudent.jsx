@@ -7,7 +7,7 @@ const AddStudent = () => {
   const navigate = useNavigate();
 
   // ==========================================
-  // STUDENT FORM
+  // STUDENT FORM*
   // ==========================================
 
   const initialFormData = {
@@ -30,20 +30,20 @@ const AddStudent = () => {
   const [formData, setFormData] = useState(initialFormData);
 
   // ==========================================
-  // COURSES
+  // COURSES*
   // ==========================================
 
   const [courses, setCourses] = useState([]);
   const [courseLoading, setCourseLoading] = useState(true);
 
   // ==========================================
-  // IMAGE
+  // IMAGE*
   // ==========================================
 
   const [imagePreview, setImagePreview] = useState(null);
 
   // ==========================================
-  // STATUS
+  // STATUS*
   // ==========================================
 
   const [loading, setLoading] = useState(false);
@@ -51,7 +51,7 @@ const AddStudent = () => {
   const [successMessage, setSuccessMessage] = useState("");
 
   // ==========================================
-  // GET COURSES
+  // GET COURSES*
   // ==========================================
 
   useEffect(() => {
@@ -88,7 +88,7 @@ const AddStudent = () => {
   }, []);
 
   // ==========================================
-  // HANDLE INPUT
+  // HANDLE INPUT*
   // ==========================================
 
   const handleChange = (e) => {
@@ -104,7 +104,7 @@ const AddStudent = () => {
   };
 
   // ==========================================
-  // HANDLE IMAGE
+  // HANDLE IMAGE*
   // ==========================================
 
   const handleImageChange = (e) => {
@@ -121,7 +121,7 @@ const AddStudent = () => {
       "image/webp",
     ];
 
-    // Check file type
+    // Check file type*
     if (!allowedTypes.includes(file.type)) {
       setErrorMessage(
         "Only JPG, JPEG, PNG and WEBP images are allowed."
@@ -131,7 +131,7 @@ const AddStudent = () => {
       return;
     }
 
-    // Check file size
+    // Check file size*
     if (file.size > 5 * 1024 * 1024) {
       setErrorMessage("Image size must be less than 5MB.");
 
@@ -152,7 +152,7 @@ const AddStudent = () => {
   };
 
   // ==========================================
-  // RESET FORM
+  // RESET FORM*
   // ==========================================
 
   const handleReset = () => {
@@ -169,7 +169,7 @@ const AddStudent = () => {
   };
 
   // ==========================================
-  // SUBMIT FORM
+  // SUBMIT FORM*
   // ==========================================
 
   const handleSubmit = async (e) => {
@@ -179,7 +179,7 @@ const AddStudent = () => {
     setSuccessMessage("");
 
     // ==========================================
-    // FRONTEND VALIDATION
+    // FRONTEND VALIDATION*
     // ==========================================
 
     if (!formData.name.trim()) {
@@ -228,7 +228,7 @@ const AddStudent = () => {
     }
 
     // ==========================================
-    // START LOADING
+    // START LOADING*
     // ==========================================
 
     setLoading(true);
@@ -252,7 +252,7 @@ const AddStudent = () => {
       data.append("image", formData.image);
 
       // ==========================================
-      // API REQUEST
+      // API REQUEST*
       // ==========================================
 
       const response = await api.post("/students", data);
@@ -287,22 +287,22 @@ const AddStudent = () => {
   };
 
   // ==========================================
-  // UI
+  // UI*
   // ==========================================
 
   return (
     <AdminLayout title="Add Student">
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
 
         {/* ==========================================
-            PAGE HEADER
+            PAGE HEADER*
         ========================================== */}
 
         <div
           className="
             bg-gradient-to-r
-            from-[#075985]
-            to-[#064e6f]
+            from-[#198754]
+            to-[#146c43]
             rounded-2xl
             p-6 md:p-8
             text-white
@@ -333,7 +333,7 @@ const AddStudent = () => {
                     text-2xl
                   "
                 >
-                  👨‍🎓
+                  <i className="fa-solid fa-user-plus text-white"></i>
                 </div>
 
                 <h1 className="text-2xl md:text-3xl font-bold">
@@ -341,7 +341,7 @@ const AddStudent = () => {
                 </h1>
               </div>
 
-              <p className="text-blue-100">
+              <p className="text-green-100">
                 Register a new student in the system.
               </p>
             </div>
@@ -351,22 +351,26 @@ const AddStudent = () => {
               onClick={() => navigate("/students")}
               className="
                 bg-white
-                text-[#075985]
-                hover:bg-blue-50
+                text-[#198754]
+                hover:bg-green-50
                 px-5 py-3
                 rounded-xl
                 font-semibold
                 transition-all
                 shadow-md
+                flex
+                items-center
+                gap-2
               "
             >
+              <i className="fa-solid fa-users"></i>
               View Students
             </button>
           </div>
         </div>
 
         {/* ==========================================
-            ERROR MESSAGE
+            ERROR MESSAGE*
         ========================================== */}
 
         {errorMessage && (
@@ -381,7 +385,7 @@ const AddStudent = () => {
               flex items-start gap-3
             "
           >
-            <span className="text-xl">⚠️</span>
+            <i className="fa-solid fa-circle-exclamation text-xl mt-0.5"></i>
 
             <div>
               <p className="font-semibold">
@@ -396,7 +400,7 @@ const AddStudent = () => {
         )}
 
         {/* ==========================================
-            SUCCESS MESSAGE
+            SUCCESS MESSAGE*
         ========================================== */}
 
         {successMessage && (
@@ -411,7 +415,7 @@ const AddStudent = () => {
               flex items-start gap-3
             "
           >
-            <span className="text-xl">✅</span>
+            <i className="fa-solid fa-circle-check text-xl mt-0.5"></i>
 
             <div>
               <p className="font-semibold">
@@ -426,7 +430,7 @@ const AddStudent = () => {
         )}
 
         {/* ==========================================
-            FORM CARD
+            FORM CARD*
         ========================================== */}
 
         <div
@@ -440,14 +444,14 @@ const AddStudent = () => {
         >
 
           {/* ==========================================
-              FORM HEADER
+              FORM HEADER*
           ========================================== */}
 
           <div
             className="
               bg-gradient-to-r
-              from-[#075985]
-              to-[#064e6f]
+              from-[#198754]
+              to-[#146c43]
               text-white
               px-6 md:px-8
               py-6
@@ -465,7 +469,7 @@ const AddStudent = () => {
                   text-2xl
                 "
               >
-                👨‍🎓
+                <i className="fa-solid fa-id-card"></i>
               </div>
 
               <div>
@@ -473,7 +477,7 @@ const AddStudent = () => {
                   Student Information
                 </h2>
 
-                <p className="text-sm text-blue-100 mt-1">
+                <p className="text-sm text-green-100 mt-1">
                   Enter student details below
                 </p>
               </div>
@@ -481,7 +485,7 @@ const AddStudent = () => {
           </div>
 
           {/* ==========================================
-              FORM
+              FORM*
           ========================================== */}
 
           <form
@@ -490,7 +494,7 @@ const AddStudent = () => {
           >
 
             {/* ==========================================
-                STUDENT IMAGE
+                STUDENT IMAGE*
             ========================================== */}
 
             <div className="mb-9">
@@ -499,15 +503,15 @@ const AddStudent = () => {
                   className="
                     w-10 h-10
                     rounded-xl
-                    bg-blue-100
-                    text-[#075985]
+                    bg-green-100
+                    text-[#198754]
                     flex
                     items-center
                     justify-center
                     text-xl
                   "
                 >
-                  📷
+                  <i className="fa-solid fa-camera"></i>
                 </div>
 
                 <div>
@@ -561,11 +565,11 @@ const AddStudent = () => {
                     />
                   ) : (
                     <div className="text-center text-gray-400">
-                      <div className="text-4xl">
-                        👤
+                      <div className="text-3xl">
+                        <i className="fa-solid fa-image"></i>
                       </div>
 
-                      <p className="text-xs mt-2">
+                      <p className="text-xs mt-2 font-medium">
                         No Image
                       </p>
                     </div>
@@ -607,23 +611,23 @@ const AddStudent = () => {
                       file:px-4
                       file:rounded-lg
                       file:border-0
-                      file:bg-blue-50
-                      file:text-[#075985]
+                      file:bg-green-50
+                      file:text-[#198754]
                       file:font-semibold
-                      hover:file:bg-blue-100
+                      hover:file:bg-green-100
                     "
                   />
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="px-3 py-1 bg-blue-50 text-[#075985] rounded-full text-xs font-medium">
+                    <span className="px-3 py-1 bg-green-50 text-[#198754] rounded-full text-xs font-medium">
                       JPG
                     </span>
 
-                    <span className="px-3 py-1 bg-blue-50 text-[#075985] rounded-full text-xs font-medium">
+                    <span className="px-3 py-1 bg-green-50 text-[#198754] rounded-full text-xs font-medium">
                       PNG
                     </span>
 
-                    <span className="px-3 py-1 bg-blue-50 text-[#075985] rounded-full text-xs font-medium">
+                    <span className="px-3 py-1 bg-green-50 text-[#198754] rounded-full text-xs font-medium">
                       WEBP
                     </span>
 
@@ -636,7 +640,7 @@ const AddStudent = () => {
             </div>
 
             {/* ==========================================
-                PERSONAL INFORMATION
+                PERSONAL INFORMATION*
             ========================================== */}
 
             <div className="mb-8">
@@ -645,15 +649,15 @@ const AddStudent = () => {
                   className="
                     w-10 h-10
                     rounded-xl
-                    bg-blue-100
-                    text-[#075985]
+                    bg-green-100
+                    text-[#198754]
                     flex
                     items-center
                     justify-center
                     text-xl
                   "
                 >
-                  👤
+                  <i className="fa-solid fa-user"></i>
                 </div>
 
                 <div>
@@ -692,9 +696,9 @@ const AddStudent = () => {
                       rounded-xl
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                     "
                   />
                 </div>
@@ -722,9 +726,9 @@ const AddStudent = () => {
                       rounded-xl
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                     "
                   />
                 </div>
@@ -739,7 +743,7 @@ const AddStudent = () => {
                     onChange={handleChange}
                     placeholder="e.g. 42101-1234567-1"
                     maxLength={15}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#075985] focus:ring-4 focus:ring-blue-100"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#198754] focus:ring-4 focus:ring-green-100"
                   />
                 </div>
 
@@ -752,7 +756,7 @@ const AddStudent = () => {
                     value={formData.qualification}
                     onChange={handleChange}
                     placeholder="e.g. Matric, Intermediate"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#075985] focus:ring-4 focus:ring-blue-100"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#198754] focus:ring-4 focus:ring-green-100"
                   />
                 </div>
 
@@ -765,7 +769,7 @@ const AddStudent = () => {
                     value={formData.domicile}
                     onChange={handleChange}
                     placeholder="e.g. Hyderabad, Sindh"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#075985] focus:ring-4 focus:ring-blue-100"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#198754] focus:ring-4 focus:ring-green-100"
                   />
                 </div>
 
@@ -792,9 +796,9 @@ const AddStudent = () => {
                       rounded-xl
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                     "
                   />
                 </div>
@@ -822,9 +826,9 @@ const AddStudent = () => {
                       rounded-xl
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                     "
                   />
                   <p className="mt-1 text-xs text-gray-500">
@@ -855,9 +859,9 @@ const AddStudent = () => {
                       rounded-xl
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                     "
                   />
                 </div>
@@ -874,7 +878,7 @@ const AddStudent = () => {
                     value={formData.parentPhone}
                     onChange={handleChange}
                     placeholder="Enter parent's phone number"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#075985] focus:ring-4 focus:ring-blue-100"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none transition-all focus:border-[#198754] focus:ring-4 focus:ring-green-100"
                   />
                 </div>
 
@@ -896,9 +900,9 @@ const AddStudent = () => {
                       bg-white
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                     "
                   >
                     <option value="Male">Male</option>
@@ -907,7 +911,7 @@ const AddStudent = () => {
                   </select>
                 </div>
 
-                {/* COURSE: SAME ROW AS GENDER */}
+                {/* COURSE */}
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -928,9 +932,9 @@ const AddStudent = () => {
                       bg-white
                       outline-none
                       transition-all
-                      focus:border-[#075985]
+                      focus:border-[#198754]
                       focus:ring-4
-                      focus:ring-blue-100
+                      focus:ring-green-100
                       disabled:bg-gray-100
                       disabled:cursor-not-allowed
                     "
@@ -959,7 +963,7 @@ const AddStudent = () => {
 
               </div>
 
-              {/* STUDENT STATUS: DISPLAY BELOW GENDER AND COURSE */}
+              {/* STUDENT STATUS */}
               <div className="mt-5">
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
                   Student Status
@@ -976,9 +980,9 @@ const AddStudent = () => {
                     bg-white
                     outline-none
                     transition-all
-                    focus:border-[#075985]
+                    focus:border-[#198754]
                     focus:ring-4
-                    focus:ring-blue-100
+                    focus:ring-green-100
                   "
                 >
                   <option value="Active">Active</option>
@@ -1000,7 +1004,7 @@ const AddStudent = () => {
             </div>
 
             {/* ==========================================
-                ADDRESS
+                ADDRESS*
             ========================================== */}
 
             <div className="border-t border-gray-100 pt-7">
@@ -1009,15 +1013,15 @@ const AddStudent = () => {
                   className="
                     w-10 h-10
                     rounded-xl
-                    bg-blue-100
-                    text-[#075985]
+                    bg-green-100
+                    text-[#198754]
                     flex
                     items-center
                     justify-center
                     text-xl
                   "
                 >
-                  📍
+                  <i className="fa-solid fa-location-dot"></i>
                 </div>
 
                 <div>
@@ -1043,127 +1047,33 @@ const AddStudent = () => {
                   rounded-xl
                   outline-none
                   resize-none
-                  transition-all
-                  focus:border-[#075985]
+                  focus:border-[#198754]
                   focus:ring-4
-                  focus:ring-blue-100
+                  focus:ring-green-100
                 "
               />
             </div>
 
-            {/* ==========================================
-                BUTTONS
-            ========================================== */}
-
-            <div
-              className="
-                flex
-                flex-col
-                sm:flex-row
-                gap-3
-                mt-8
-                pt-6
-                border-t border-gray-100
-                sm:justify-end
-              "
-            >
-              {/* RESET */}
-
+            {/* BUTTONS / SUBMIT */}
+            <div className="mt-8 flex items-center justify-end gap-4">
               <button
                 type="button"
                 onClick={handleReset}
-                disabled={loading}
-                className="
-                  px-6 py-3
-                  bg-gray-100
-                  hover:bg-gray-200
-                  text-gray-700
-                  rounded-xl
-                  font-semibold
-                  transition-all
-                  disabled:opacity-50
-                "
+                className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold transition-all"
               >
                 Reset
               </button>
 
-              {/* CANCEL */}
-
-              <button
-                type="button"
-                onClick={() => navigate("/students")}
-                disabled={loading}
-                className="
-                  px-6 py-3
-                  bg-gray-700
-                  hover:bg-gray-800
-                  text-white
-                  rounded-xl
-                  font-semibold
-                  transition-all
-                  disabled:opacity-50
-                "
-              >
-                Cancel
-              </button>
-
-              {/* ADD STUDENT */}
-
               <button
                 type="submit"
-                disabled={
-                  loading ||
-                  courseLoading ||
-                  courses.length === 0
-                }
-                className="
-                  px-7 py-3
-                  bg-[#075985]
-                  hover:bg-[#064e6f]
-                  text-white
-                  rounded-xl
-                  font-semibold
-                  transition-all
-                  shadow-md
-                  hover:shadow-lg
-                  disabled:opacity-50
-                  disabled:cursor-not-allowed
-                "
+                disabled={loading}
+                className="px-6 py-3 rounded-xl bg-[#198754] text-white hover:bg-[#146c43] font-semibold transition-all shadow-md disabled:opacity-50"
               >
-                {loading
-                  ? "Adding Student..."
-                  : "＋ Add Student"}
+                {loading ? "Saving..." : "Add Student"}
               </button>
             </div>
+
           </form>
-        </div>
-
-        {/* ==========================================
-            BOTTOM INFO
-        ========================================== */}
-
-        <div
-          className="
-            mt-5
-            px-5 py-4
-            rounded-xl
-            bg-blue-50
-            border border-blue-100
-            text-sm
-            text-blue-700
-            flex
-            items-start
-            gap-3
-          "
-        >
-          <span className="text-lg">
-            💡
-          </span>
-
-          <p>
-            Please make sure all student information is
-            correct before submitting the form.
-          </p>
         </div>
       </div>
     </AdminLayout>

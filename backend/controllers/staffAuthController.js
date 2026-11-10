@@ -5,55 +5,47 @@ const Staff = require("../models/Staff");
 
 const staffLogin = async (req, res) => {
   try {
-    const { staffName, email, password } = req.body;
+    const identifier = String(req.body.identifier || "").trim();
+    const password = String(req.body.password || "");
 
-    if (
-      !String(staffName || "").trim() ||
-      !String(email || "").trim() ||
-      !String(password || "")
-    ) {
+    if (!identifier || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please enter staff name, email and password.",
+        message: "Please enter your email/CNIC and password.",
       });
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is missing from backend .env");
-
       return res.status(500).json({
         success: false,
         message: "Server authentication is not configured.",
       });
     }
 
-    const normalizedName = String(staffName).trim();
-    const normalizedEmail = String(email).trim().toLowerCase();
+    const isEmail = identifier.includes("@");
 
-    // Bypass the model's defaultScope so passwordHash is available.
     const staff = await Staff.unscoped().findOne({
-      where: {
-        staffName: normalizedName,
-        email: normalizedEmail,
-      },
+      where: isEmail
+        ? { email: identifier.toLowerCase() }
+        : { cnicNo: identifier },
     });
 
     if (!staff || !staff.passwordHash) {
       return res.status(401).json({
         success: false,
-        message: "Invalid staff name, email or password.",
+        message: "Invalid email/CNIC or password.",
       });
     }
 
     const passwordMatches = await bcrypt.compare(
-      String(password),
+      password,
       staff.passwordHash
     );
 
     if (!passwordMatches) {
       return res.status(401).json({
         success: false,
-        message: "Invalid staff name, email or password.",
+        message: "Invalid email/CNIC or password.",
       });
     }
 
@@ -77,18 +69,21 @@ const staffLogin = async (req, res) => {
         id: staff.id,
         staffName: staff.staffName,
         fatherName: staff.fatherName,
+        cnicNo: staff.cnicNo,
         email: staff.email,
         mobileNo: staff.mobileNo,
         designation: staff.designation,
+        address: staff.address,
+        salary: staff.salary,
         image: staff.image,
       },
     });
   } catch (error) {
-    console.error("staffLogin:", error);
+    console.error("staffLogin error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Staff login failed. Please try again.",
+      message: "Staff login failed. Check backend terminal.",
     });
   }
 };

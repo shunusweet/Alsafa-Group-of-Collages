@@ -19,6 +19,7 @@ const getMyStaffProfile = async (req, res) => {
         "fatherName",
         "email",
         "mobileNo",
+        "cnicNo",
         "designation",
         "address",
         "salary",

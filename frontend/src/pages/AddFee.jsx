@@ -1,675 +1,566 @@
 import { useEffect, useState } from "react";
-import {
-    useNavigate,
-    useSearchParams
-} from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import AdminLayout from "../components/AdminLayout";
 import api from "../services/api";
 
-// ==========================================
-// CURRENT MONTH: YYYY-MM
-// ==========================================
-
 const getCurrentMonth = () => {
-    const now = new Date();
+  const now = new Date();
 
-    return (
-        now.getFullYear() +
-        "-" +
-        String(now.getMonth() + 1).padStart(2, "0")
-    );
+  return (
+    now.getFullYear() +
+    "-" +
+    String(now.getMonth() + 1).padStart(2, "0")
+  );
 };
 
-// ==========================================
-// CURRENCY FORMAT
-// ==========================================
-
 const formatCurrency = (amount) =>
-    "Rs " +
-    Number(amount || 0).toLocaleString("en-PK", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-
-// ==========================================
-// ADD FEE COMPONENT
-// ==========================================
+  "Rs " +
+  Number(amount || 0).toLocaleString("en-PK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const AddFee = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-    const [searchParams] = useSearchParams();
+  const [students, setStudents] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [feeAccounts, setFeeAccounts] = useState([]);
 
-    const [students, setStudents] =
-        useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-    const [courses, setCourses] =
-        useState([]);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-    const [feeAccounts, setFeeAccounts] =
-        useState([]);
+  const [formData, setFormData] = useState({
+    studentId: searchParams.get("studentId") || "",
+    totalFee: "",
+    monthlyFee: "",
+    month: getCurrentMonth(),
+    amountPaid: "",
+    remarks: "",
+  });
 
-    const [loading, setLoading] =
-        useState(true);
+  // ==========================================
+  // LOAD DATA
+  // ==========================================
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
 
-    const [saving, setSaving] =
-        useState(false);
+        const [studentResponse, courseResponse, feeResponse] =
+          await Promise.all([
+            api.get("/students"),
+            api.get("/courses"),
+            api.get("/fees"),
+          ]);
 
-    const [error, setError] =
-        useState("");
+        const studentData =
+          studentResponse.data?.students ||
+          studentResponse.data?.data ||
+          [];
 
-    const [formData, setFormData] =
-        useState({
-            studentId:
-                searchParams.get("studentId") || "",
-            totalFee: "",
-            month: getCurrentMonth(),
-            amountPaid: "",
-            remarks: ""
-        });
+        const courseData =
+          courseResponse.data?.courses ||
+          courseResponse.data?.data ||
+          [];
 
-    // ==========================================
-    // LOAD STUDENTS, COURSES AND EXISTING FEES
-    // ==========================================
+        const feeData =
+          feeResponse.data?.fees ||
+          feeResponse.data?.data ||
+          [];
 
-    useEffect(() => {
-        const loadFormData = async () => {
-            try {
-                setLoading(true);
-                setError("");
+        setStudents(studentData);
+        setCourses(courseData);
+        setFeeAccounts(feeData);
 
-                const [
-                    studentResponse,
-                    courseResponse,
-                    feeResponse
-                ] = await Promise.all([
-                    api.get("/students"),
-                    api.get("/courses"),
-                    api.get("/fees")
-                ]);
+        const requestedId = searchParams.get("studentId");
 
-                const studentData =
-                    studentResponse.data?.students ||
-                    studentResponse.data?.data ||
-                    [];
+        if (requestedId) {
+          const existing = feeData.find(
+            (fee) =>
+              Number(fee.studentId) === Number(requestedId)
+          );
 
-                const courseData =
-                    courseResponse.data?.courses ||
-                    [];
-
-                const feeData =
-                    feeResponse.data?.fees ||
-                    [];
-
-                setStudents(studentData);
-                setCourses(courseData);
-                setFeeAccounts(feeData);
-
-                // If opened from a fee record,
-                // preselect that student.
-                const requestedId =
-                    searchParams.get("studentId");
-
-                if (requestedId) {
-                    const existing = feeData.find(
-                        (fee) =>
-                            Number(fee.studentId) ===
-                            Number(requestedId)
-                    );
-
-                    const paid = existing
-                        ? (existing.payments || []).reduce(
-                            (sum, payment) =>
-                                sum +
-                                Number(payment.amountPaid || 0),
-                            0
-                        )
-                        : 0;
-
-                    const balance = existing
-                        ? Math.max(
-                            0,
-                            Number(existing.totalFee) - paid
-                        )
-                        : 0;
-
-                    setFormData((previous) => ({
-                        ...previous,
-                        studentId: requestedId,
-                        totalFee: existing
-                            ? String(existing.totalFee)
-                            : "",
-                        amountPaid:
-                            existing && balance > 0
-                                ? balance.toFixed(2)
-                                : ""
-                    }));
-                }
-            } catch (err) {
-                console.error(
-                    "Load Fee Form Data Error:",
-                    err
-                );
-
-                setError(
-                    err.response?.data?.message ||
-                    "Unable to load students, courses or fee accounts."
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadFormData();
-    }, [searchParams]);
-
-    // ==========================================
-    // SELECTED STUDENT AND FEE ACCOUNT
-    // ==========================================
-
-    const selectedStudent = students.find(
-        (student) =>
-            Number(student.id) ===
-            Number(formData.studentId)
-    );
-
-    const existingFee = feeAccounts.find(
-        (fee) =>
-            Number(fee.studentId) ===
-            Number(formData.studentId)
-    );
-
-    const selectedCourse = courses.find(
-        (course) =>
-            course.courseName?.trim().toLowerCase() ===
-            selectedStudent?.course?.trim().toLowerCase()
-    );
-
-    const previousPaid = existingFee
-        ? (existingFee.payments || []).reduce(
+          const paid = (existing?.payments || []).reduce(
             (sum, payment) =>
-                sum +
-                Number(payment.amountPaid || 0),
+              sum + Number(payment.amountPaid || 0),
             0
-        )
+          );
+
+          const balance = existing
+            ? Math.max(0, Number(existing.totalFee) - paid)
+            : 0;
+
+          setFormData((previous) => ({
+            ...previous,
+            studentId: requestedId,
+            totalFee: existing
+              ? String(existing.totalFee)
+              : "",
+            monthlyFee: existing
+              ? String(existing.monthlyFee || 0)
+              : "",
+            amountPaid:
+              existing && balance > 0
+                ? balance.toFixed(2)
+                : "",
+          }));
+        }
+      } catch (err) {
+        console.error("Load Fee Data Error:", err);
+
+        setError(
+          err.response?.data?.message ||
+            "Unable to load fee information."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [searchParams]);
+
+  // ==========================================
+  // SELECTED RECORDS
+  // ==========================================
+  const selectedStudent = students.find(
+    (student) =>
+      Number(student.id) === Number(formData.studentId)
+  );
+
+  const existingFee = feeAccounts.find(
+    (fee) =>
+      Number(fee.studentId) === Number(formData.studentId)
+  );
+
+  const selectedCourse = courses.find(
+    (course) =>
+      course.courseName?.trim().toLowerCase() ===
+      selectedStudent?.course?.trim().toLowerCase()
+  );
+
+  const previousPaid = (existingFee?.payments || []).reduce(
+    (sum, payment) =>
+      sum + Number(payment.amountPaid || 0),
+    0
+  );
+
+  const remainingBalance = existingFee
+    ? Math.max(
+        0,
+        Number(existingFee.totalFee) - previousPaid
+      )
+    : Number(formData.totalFee || 0);
+
+  // ==========================================
+  // HANDLE INPUTS
+  // ==========================================
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    if (name === "studentId") {
+      const fee = feeAccounts.find(
+        (item) => Number(item.studentId) === Number(value)
+      );
+
+      const paid = (fee?.payments || []).reduce(
+        (sum, payment) =>
+          sum + Number(payment.amountPaid || 0),
+        0
+      );
+
+      const balance = fee
+        ? Math.max(0, Number(fee.totalFee) - paid)
         : 0;
 
-    const remainingBalance = existingFee
-        ? Math.max(
-            0,
-            Number(existingFee.totalFee) - previousPaid
-        )
-        : Number(formData.totalFee || 0);
+      setFormData((previous) => ({
+        ...previous,
+        studentId: value,
+        totalFee: fee ? String(fee.totalFee) : "",
+        monthlyFee: fee ? String(fee.monthlyFee || 0) : "",
+        amountPaid:
+          fee && balance > 0 ? balance.toFixed(2) : "",
+      }));
+    } else {
+      setFormData((previous) => ({
+        ...previous,
+        [name]: value,
+      }));
+    }
 
-    // ==========================================
-    // HANDLE INPUT CHANGES
-    // ==========================================
+    setError("");
+    setSuccessMessage("");
+  };
 
-    const handleChange = (event) => {
-        const { name, value } = event.target;
+  // ==========================================
+  // SUBMIT FEE
+  // ==========================================
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-        if (name === "studentId") {
-            const fee = feeAccounts.find(
-                (item) =>
-                    Number(item.studentId) ===
-                    Number(value)
-            );
+    setError("");
+    setSuccessMessage("");
 
-            const paid = fee
-                ? (fee.payments || []).reduce(
-                    (sum, payment) =>
-                        sum +
-                        Number(payment.amountPaid || 0),
-                    0
-                )
-                : 0;
+    if (!selectedStudent) {
+      setError("Please select a student.");
+      return;
+    }
 
-            const balance = fee
-                ? Math.max(
-                    0,
-                    Number(fee.totalFee) - paid
-                )
-                : 0;
+    const total = Number(formData.totalFee);
+    const monthly = Number(formData.monthlyFee);
+    const amount = Number(formData.amountPaid);
 
-            setFormData((previous) => ({
-                ...previous,
-                studentId: value,
-                totalFee: fee
-                    ? String(fee.totalFee)
-                    : "",
-                amountPaid:
-                    fee && balance > 0
-                        ? balance.toFixed(2)
-                        : ""
-            }));
-        } else {
-            setFormData((previous) => ({
-                ...previous,
-                [name]: value
-            }));
-        }
+    if (!existingFee && (!Number.isFinite(total) || total <= 0)) {
+      setError("Please enter a valid total fee.");
+      return;
+    }
 
-        setError("");
-    };
+    if (!Number.isFinite(monthly) || monthly < 0) {
+      setError("Please enter a valid monthly fee.");
+      return;
+    }
 
-    // ==========================================
-    // SUBMIT MONTHLY PAYMENT
-    // ==========================================
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Payment amount must be greater than zero.");
+      return;
+    }
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
+    if (amount > remainingBalance + 0.001) {
+      setError(
+        `Payment cannot exceed remaining balance of ${formatCurrency(
+          remainingBalance
+        )}.`
+      );
+      return;
+    }
 
-        setError("");
+    try {
+      setSaving(true);
 
-        if (!selectedStudent) {
-            setError("Please select a student.");
-            return;
-        }
+      const response = await api.post("/fees", {
+        studentId: Number(formData.studentId),
 
-        if (
-            !existingFee &&
-            Number(formData.totalFee) <= 0
-        ) {
-            setError(
-                "Please enter the student's total fee."
-            );
-            return;
-        }
+        totalFee: existingFee
+          ? Number(existingFee.totalFee)
+          : total,
 
-        const amount = Number(
-            formData.amountPaid
+        monthlyFee: monthly,
+        month: formData.month,
+        amountPaid: amount,
+        remarks: formData.remarks.trim(),
+      });
+
+      if (response.data?.success) {
+        setSuccessMessage(
+          response.data.message ||
+            "Fee payment saved successfully."
         );
 
-        if (!Number.isFinite(amount) || amount <= 0) {
-            setError(
-                "Payment amount must be greater than zero."
-            );
-            return;
-        }
+        setTimeout(() => navigate("/fees"), 700);
+      } else {
+        setError(
+          response.data?.message || "Unable to save fee."
+        );
+      }
+    } catch (err) {
+      console.error("Save Fee Error:", err);
 
-        if (amount > remainingBalance + 0.001) {
-            setError(
-                `Payment cannot exceed the remaining balance of ${formatCurrency(remainingBalance)}.`
-            );
-            return;
-        }
+      setError(
+        err.response?.data?.message ||
+          "Fee could not be saved."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
-        try {
-            setSaving(true);
+  // ==========================================
+  // STYLES
+  // ==========================================
+  const inputStyle =
+    "w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-[#198754] focus:ring-4 focus:ring-green-100 disabled:bg-gray-100";
 
-            const response = await api.post(
-                "/fees",
-                {
-                    studentId: Number(
-                        formData.studentId
-                    ),
-                    totalFee: existingFee
-                        ? Number(existingFee.totalFee)
-                        : Number(formData.totalFee),
-                    month: formData.month,
-                    amountPaid: amount,
-                    remarks: formData.remarks.trim()
-                }
-            );
+  const labelStyle =
+    "mb-2 block text-sm font-semibold text-gray-700";
 
-            if (response.data?.success) {
-                navigate("/fees");
-            } else {
-                setError(
-                    response.data?.message ||
-                    "Failed to save fee payment."
-                );
-            }
-        } catch (err) {
-            console.error(
-                "Save Fee Error:",
-                err
-            );
+  return (
+    <AdminLayout title="Add Fee">
+      <div className="w-full space-y-6">
 
-            setError(
-                err.response?.data?.message ||
-                "Fee could not be saved. Please check the backend."
-            );
-        } finally {
-            setSaving(false);
-        }
-    };
+        <div className="flex flex-col justify-between gap-4 rounded-2xl bg-gradient-to-r from-[#198754] to-[#146c43] p-6 text-white shadow-lg md:flex-row md:items-center">
+          <div>
+            <p className="text-sm font-medium text-green-100">
+              Fee Management
+            </p>
 
-    return (
-        <AdminLayout title="Add Fee">
+            <h1 className="mt-1 text-3xl font-bold">
+              Add Student Fee
+            </h1>
 
-            <div className="space-y-6">
+            <p className="mt-2 text-sm text-green-100">
+              Manage total fee, monthly fee and student payments.
+            </p>
+          </div>
 
-                {/* PAGE HEADER */}
+          <button
+            type="button"
+            onClick={() => navigate("/fees")}
+            className="rounded-xl border border-white/30 bg-white/15 px-5 py-3 text-sm font-semibold text-white hover:bg-white/25"
+          >
+            View Fees
+          </button>
+        </div>
 
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        )}
 
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-800">
-                            Add Student Fee
-                        </h1>
+        {successMessage && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
+            {successMessage}
+          </div>
+        )}
 
-                        <p className="mt-1 text-sm text-gray-500">
-                            Record a student's monthly payment.
-                        </p>
-                    </div>
+        {loading ? (
+          <div className="rounded-2xl bg-white p-12 text-center shadow-sm">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-green-100 border-t-[#198754]" />
+            <p className="mt-4 text-sm text-gray-500">
+              Loading student information...
+            </p>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+          >
+            <div className="bg-gradient-to-r from-[#198754] to-[#146c43] p-6 text-white">
+              <h2 className="text-xl font-bold">
+                Fee Collection Form
+              </h2>
 
-                    <div className="flex flex-wrap gap-3">
+              <p className="mt-1 text-sm text-green-100">
+                Enter student and fee details.
+              </p>
+            </div>
 
-                        <button
-                            type="button"
-                            onClick={() =>
-                                navigate("/fees")
-                            }
-                            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+            <div className="space-y-7 p-6 md:p-8">
+
+              {/* STUDENT INFORMATION */}
+              <section>
+                <h3 className="mb-5 text-lg font-bold text-gray-800">
+                  Student Information
+                </h3>
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+
+                  <div>
+                    <label className={labelStyle}>
+                      Select Student *
+                    </label>
+
+                    <select
+                      name="studentId"
+                      value={formData.studentId}
+                      onChange={handleChange}
+                      className={inputStyle}
+                      required
+                    >
+                      <option value="">Select Student</option>
+
+                      {students.map((student) => (
+                        <option
+                          key={student.id}
+                          value={student.id}
                         >
-                            View Fees
-                        </button>
+                          {student.name} - {student.fatherName || ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                        <button
-                            type="button"
-                            onClick={() => navigate(-1)}
-                            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                        >
-                            ← Back
-                        </button>
+                  <div>
+                    <label className={labelStyle}>
+                      Course
+                    </label>
 
-                    </div>
+                    <input
+                      value={selectedStudent?.course || ""}
+                      readOnly
+                      className={inputStyle}
+                    />
+                  </div>
 
+                  <div>
+                    <label className={labelStyle}>
+                      Course Duration
+                    </label>
+
+                    <input
+                      value={selectedCourse?.courseDuration || ""}
+                      readOnly
+                      className={inputStyle}
+                    />
+                  </div>
                 </div>
+              </section>
 
-                {/* ERROR MESSAGE */}
+              <div className="border-t border-gray-100" />
 
-                {error && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        {error}
-                    </div>
-                )}
+              {/* FEE INFORMATION */}
+              <section>
+                <h3 className="mb-5 text-lg font-bold text-gray-800">
+                  Fee Information
+                </h3>
 
-                {/* FORM */}
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm md:p-6"
-                >
+                  <div>
+                    <label className={labelStyle}>
+                      Total Course Fee (Rs) *
+                    </label>
 
-                    <h2 className="mb-6 border-b border-gray-100 pb-4 text-lg font-bold text-gray-800">
-                        Student and Fee Details
-                    </h2>
+                    <input
+                      type="number"
+                      name="totalFee"
+                      min="0"
+                      step="0.01"
+                      value={formData.totalFee}
+                      onChange={handleChange}
+                      disabled={Boolean(existingFee)}
+                      className={inputStyle}
+                      placeholder="Enter total fee"
+                      required
+                    />
 
-                    {loading ? (
-                        <p className="py-8 text-center text-gray-500">
-                            Loading student information...
-                        </p>
-                    ) : (
-                        <>
-                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-
-                                {/* SELECT STUDENT */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Select Student *
-                                    </label>
-
-                                    <select
-                                        name="studentId"
-                                        value={formData.studentId}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-blue-500"
-                                    >
-                                        <option value="">
-                                            Choose student
-                                        </option>
-
-                                        {students.map((student) => (
-                                            <option
-                                                key={student.id}
-                                                value={student.id}
-                                            >
-                                                {student.name}
-                                                {" — "}
-                                                {student.fatherName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* STUDENT NAME */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Student Name
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        value={
-                                            selectedStudent?.name || ""
-                                        }
-                                        readOnly
-                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-gray-700"
-                                    />
-                                </div>
-
-                                {/* FATHER NAME */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Father Name
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        value={
-                                            selectedStudent?.fatherName || ""
-                                        }
-                                        readOnly
-                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-gray-700"
-                                    />
-                                </div>
-
-                                {/* COURSE / DIPLOMA */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Course / Diploma
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        value={
-                                            selectedStudent?.course || ""
-                                        }
-                                        readOnly
-                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-gray-700"
-                                    />
-                                </div>
-
-                                {/* COURSE DURATION */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Course Duration
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        value={
-                                            selectedCourse?.courseDuration || ""
-                                        }
-                                        readOnly
-                                        placeholder="Course duration unavailable"
-                                        className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-gray-700"
-                                    />
-                                </div>
-
-                                {/* TOTAL FEES */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Total Fees (Rs) *
-                                    </label>
-
-                                    <input
-                                        type="number"
-                                        name="totalFee"
-                                        value={formData.totalFee}
-                                        onChange={handleChange}
-                                        min="0.01"
-                                        step="0.01"
-                                        required={!existingFee}
-                                        disabled={Boolean(existingFee)}
-                                        placeholder="Enter total course fee"
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-blue-500 disabled:bg-gray-100"
-                                    />
-
-                                    {existingFee && (
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            Saved total fee cannot be changed here.
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* PAYMENT MONTH */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Fee Month *
-                                    </label>
-
-                                    <input
-                                        type="month"
-                                        name="month"
-                                        value={formData.month}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                {/* AMOUNT PAID */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Amount Paid (Rs) *
-                                    </label>
-
-                                    <input
-                                        type="number"
-                                        name="amountPaid"
-                                        value={formData.amountPaid}
-                                        onChange={handleChange}
-                                        min="0.01"
-                                        max={remainingBalance}
-                                        step="0.01"
-                                        required
-                                        placeholder="Enter payment amount"
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                                {/* REMARKS */}
-
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                                        Remarks
-                                    </label>
-
-                                    <input
-                                        type="text"
-                                        name="remarks"
-                                        value={formData.remarks}
-                                        onChange={handleChange}
-                                        placeholder="Optional remarks"
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-3 outline-none focus:border-blue-500"
-                                    />
-                                </div>
-
-                            </div>
-
-                            {/* EXISTING ACCOUNT SUMMARY */}
-
-                            {existingFee && (
-                                <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl bg-blue-50 p-4 sm:grid-cols-3">
-
-                                    <div>
-                                        <p className="text-sm text-gray-600">
-                                            Previously Paid
-                                        </p>
-
-                                        <p className="mt-1 font-bold text-gray-800">
-                                            {formatCurrency(previousPaid)}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-gray-600">
-                                            Remaining Balance
-                                        </p>
-
-                                        <p className="mt-1 font-bold text-red-700">
-                                            {formatCurrency(remainingBalance)}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-sm text-gray-600">
-                                            Account Status
-                                        </p>
-
-                                        <p className="mt-1 font-bold">
-                                            {remainingBalance <= 0
-                                                ? "Cleared"
-                                                : "Pending"}
-                                        </p>
-                                    </div>
-
-                                </div>
-                            )}
-
-                            {/* BUTTONS */}
-
-                            <div className="mt-6 flex flex-wrap gap-3">
-
-                                <button
-                                    type="submit"
-                                    disabled={
-                                        saving ||
-                                        !selectedStudent ||
-                                        (
-                                            Boolean(existingFee) &&
-                                            remainingBalance <= 0
-                                        )
-                                    }
-                                    className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {saving
-                                        ? "Saving..."
-                                        : "Save Fee Payment"}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        navigate("/fees")
-                                    }
-                                    className="rounded-lg border border-gray-300 px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
-                                >
-                                    Cancel
-                                </button>
-
-                            </div>
-                        </>
+                    {existingFee && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Existing total fee cannot be changed here.
+                      </p>
                     )}
+                  </div>
 
-                </form>
+                  <div>
+                    <label className={labelStyle}>
+                      Monthly Fees (Rs) *
+                    </label>
+
+                    <input
+                      type="number"
+                      name="monthlyFee"
+                      min="0"
+                      step="0.01"
+                      value={formData.monthlyFee}
+                      onChange={handleChange}
+                      className={inputStyle}
+                      placeholder="Enter monthly fee"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelStyle}>
+                      Payment Month *
+                    </label>
+
+                    <input
+                      type="month"
+                      name="month"
+                      value={formData.month}
+                      onChange={handleChange}
+                      className={inputStyle}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelStyle}>
+                      Amount Paid (Rs) *
+                    </label>
+
+                    <input
+                      type="number"
+                      name="amountPaid"
+                      min="0.01"
+                      step="0.01"
+                      value={formData.amountPaid}
+                      onChange={handleChange}
+                      className={inputStyle}
+                      placeholder="Enter received amount"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelStyle}>
+                      Remaining Balance
+                    </label>
+
+                    <input
+                      value={formatCurrency(
+                        Math.max(
+                          0,
+                          remainingBalance -
+                            Number(formData.amountPaid || 0)
+                        )
+                      )}
+                      readOnly
+                      className={inputStyle}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="border-t border-gray-100" />
+
+              {/* REMARKS */}
+              <section>
+                <label className={labelStyle}>
+                  Remarks
+                </label>
+
+                <textarea
+                  name="remarks"
+                  rows="3"
+                  value={formData.remarks}
+                  onChange={handleChange}
+                  className={inputStyle}
+                  placeholder="Enter payment remarks..."
+                />
+              </section>
+
+              {/* BUTTONS */}
+              <div className="flex flex-col justify-end gap-3 border-t border-gray-100 pt-6 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => navigate("/fees")}
+                  className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-xl bg-[#198754] px-8 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-[#146c43] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? "Saving..." : "Save Fee Payment"}
+                </button>
+              </div>
 
             </div>
-        </AdminLayout>
-    );
+          </form>
+        )}
+      </div>
+    </AdminLayout>
+  );
 };
 
 export default AddFee;

@@ -32,7 +32,7 @@ const getImageUrl = (image) => {
 // =====================================================
 
 const getInitials = (name = "") => {
-  const words = name.trim().split(" ").filter(Boolean);
+  const words = String(name).trim().split(" ").filter(Boolean);
 
   if (words.length === 0) return "S";
 
@@ -45,6 +45,28 @@ const getInitials = (name = "") => {
     words[words.length - 1].charAt(0)
   ).toUpperCase();
 };
+
+// =====================================================
+// GREEN THEME CLASSES
+// =====================================================
+
+const GREEN_BUTTON =
+  "bg-[#198754] text-white hover:bg-[#146c43]";
+
+const GREEN_FOCUS =
+  "focus:border-[#198754] focus:ring-4 focus:ring-green-100";
+
+const INPUT_CLASS = `
+  w-full px-4 py-3
+  border border-gray-300
+  rounded-xl
+  outline-none
+  transition-all
+  bg-white
+  text-sm
+  text-gray-800
+  ${GREEN_FOCUS}
+`;
 
 // =====================================================
 // STUDENTS COMPONENT
@@ -62,6 +84,7 @@ const Students = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [courseFilter, setCourseFilter] = useState("");
+  const [cardFilter, setCardFilter] = useState(""); // "total", "male", "female", "active"
 
   const [editingStudent, setEditingStudent] = useState(null);
 
@@ -83,7 +106,6 @@ const Students = () => {
   });
 
   const [editImagePreview, setEditImagePreview] = useState("");
-
   const [message, setMessage] = useState({
     type: "",
     text: "",
@@ -101,11 +123,14 @@ const Students = () => {
 
       const response = await api.get("/students");
 
-      if (response.data?.success) {
-        setStudents(response.data.students || []);
-      } else {
-        setStudents(response.data?.students || []);
-      }
+      const studentList =
+        response.data?.students ??
+        response.data?.data ??
+        [];
+
+      setStudents(
+        Array.isArray(studentList) ? studentList : []
+      );
     } catch (error) {
       console.error("Fetch students error:", error);
 
@@ -146,6 +171,11 @@ const Students = () => {
     const search = searchTerm.toLowerCase().trim();
 
     return students.filter((student) => {
+      // Card Filter Condition
+      if (cardFilter === "male" && String(student.gender || "").toLowerCase() !== "male") return false;
+      if (cardFilter === "female" && String(student.gender || "").toLowerCase() !== "female") return false;
+      if (cardFilter === "active" && String(student.status || "Active").toLowerCase() !== "active") return false;
+
       const matchesSearch =
         !search ||
         String(student.name || "")
@@ -185,10 +215,10 @@ const Students = () => {
 
       return matchesSearch && matchesCourse;
     });
-  }, [students, searchTerm, courseFilter]);
+  }, [students, searchTerm, courseFilter, cardFilter]);
 
   // ===================================================
-  // STATS
+  // STUDENT STATISTICS
   // ===================================================
 
   const maleCount = students.filter(
@@ -201,21 +231,20 @@ const Students = () => {
       String(student.gender || "").toLowerCase() === "female"
   ).length;
 
+  const activeStudentsCount = students.filter(
+    (student) =>
+      String(student.status || "Active").toLowerCase() === "active"
+  ).length;
+
   // ===================================================
   // SHOW MESSAGE
   // ===================================================
 
   const showMessage = (type, text) => {
-    setMessage({
-      type,
-      text,
-    });
+    setMessage({ type, text });
 
     setTimeout(() => {
-      setMessage({
-        type: "",
-        text: "",
-      });
+      setMessage({ type: "", text: "" });
     }, 3500);
   };
 
@@ -245,10 +274,7 @@ const Students = () => {
 
     setEditImagePreview(getImageUrl(student.image));
 
-    setMessage({
-      type: "",
-      text: "",
-    });
+    setMessage({ type: "", text: "" });
   };
 
   // ===================================================
@@ -285,7 +311,6 @@ const Students = () => {
   const handleEditChange = (e) => {
     const { name, value, files } = e.target;
 
-    // IMAGE
     if (name === "image") {
       const file = files?.[0];
 
@@ -349,7 +374,10 @@ const Students = () => {
     }
 
     if (editForm.password && editForm.password.length < 8) {
-      showMessage("error", "New password must be at least 8 characters long.");
+      showMessage(
+        "error",
+        "New password must be at least 8 characters long."
+      );
       return;
     }
 
@@ -364,15 +392,17 @@ const Students = () => {
       formData.append("qualification", editForm.qualification);
       formData.append("domicile", editForm.domicile);
       formData.append("email", editForm.email);
-      // Blank means keep the existing password unchanged.
+
       if (editForm.password.trim()) {
         formData.append("password", editForm.password);
       }
+
       formData.append("phone", editForm.phone);
       formData.append("parentPhone", editForm.parentPhone);
       formData.append("gender", editForm.gender);
       formData.append("course", editForm.course);
       formData.append("address", editForm.address);
+      formData.append("status", editForm.status);
 
       if (editForm.image) {
         formData.append("image", editForm.image);
@@ -395,8 +425,7 @@ const Students = () => {
       } else {
         showMessage(
           "error",
-          response.data?.message ||
-            "Student update failed."
+          response.data?.message || "Student update failed."
         );
       }
     } catch (error) {
@@ -417,27 +446,46 @@ const Students = () => {
   // ===================================================
 
   const handleToggleStatus = async (student) => {
-    const nextStatus = student.status === "De-Active" ? "Active" : "De-Active";
+    const nextStatus =
+      student.status === "De-Active" ? "Active" : "De-Active";
+
     try {
-      const response = await api.put(`/students/${student.id}`, {
-        status: nextStatus,
-      });
+      const response = await api.put(
+        `/students/${student.id}`,
+        { status: nextStatus }
+      );
 
       if (!response.data?.success) {
-        throw new Error(response.data?.message || "Unable to change student status.");
+        throw new Error(
+          response.data?.message ||
+            "Unable to change student status."
+        );
       }
 
-      setStudents((previous) => previous.map((item) =>
-        item.id === student.id
-          ? { ...item, ...(response.data.student || {}), status: nextStatus }
-          : item
-      ));
-      showMessage("success", `${student.name || "Student"} status changed to ${nextStatus}.`);
+      setStudents((previous) =>
+        previous.map((item) =>
+          item.id === student.id
+            ? {
+                ...item,
+                ...(response.data.student || {}),
+                status: nextStatus,
+              }
+            : item
+        )
+      );
+
+      showMessage(
+        "success",
+        `${student.name || "Student"} status changed to ${nextStatus}.`
+      );
     } catch (error) {
       console.error("Toggle student status error:", error);
+
       showMessage(
         "error",
-        error.response?.data?.message || error.message || "Unable to change student status."
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to change student status."
       );
     }
   };
@@ -454,13 +502,11 @@ const Students = () => {
     if (!confirmed) return;
 
     try {
-      const response = await api.delete(
-        `/students/${id}`
-      );
+      const response = await api.delete(`/students/${id}`);
 
       if (response.data?.success) {
-        setStudents((prev) =>
-          prev.filter((student) => student.id !== id)
+        setStudents((previous) =>
+          previous.filter((student) => student.id !== id)
         );
 
         showMessage(
@@ -470,8 +516,7 @@ const Students = () => {
       } else {
         showMessage(
           "error",
-          response.data?.message ||
-            "Unable to delete student."
+          response.data?.message || "Unable to delete student."
         );
       }
     } catch (error) {
@@ -486,17 +531,60 @@ const Students = () => {
   };
 
   // ===================================================
+  // EXPORT TO EXCEL
+  // ===================================================
+
+  const exportToExcel = () => {
+    if (filteredStudents.length === 0) {
+      showMessage("error", "No data available to export.");
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "ID,Name,Father Name,CNIC,Qualification,Domicile,Email,Phone,Parent Phone,Gender,Course,Address,Status\n";
+
+    filteredStudents.forEach((student, index) => {
+      const row = [
+        index + 1,
+        `"${student.name || ""}"`,
+        `"${student.fatherName || ""}"`,
+        `"${student.cnic || ""}"`,
+        `"${student.qualification || ""}"`,
+        `"${student.domicile || ""}"`,
+        `"${student.email || ""}"`,
+        `"${student.phone || ""}"`,
+        `"${student.parentPhone || ""}"`,
+        `"${student.gender || ""}"`,
+        `"${student.course || ""}"`,
+        `"${(student.address || "").replace(/"/g, '""')}"`,
+        `"${student.status || "Active"}"`
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Students_List_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showMessage("success", "Students data exported successfully!");
+  };
+
+  // ===================================================
   // RESET FILTERS
   // ===================================================
 
   const resetFilters = () => {
     setSearchTerm("");
     setCourseFilter("");
+    setCardFilter("");
   };
 
   const hasFilters =
-    searchTerm.trim() !== "" ||
-    courseFilter !== "";
+    searchTerm.trim() !== "" || courseFilter !== "" || cardFilter !== "";
 
   // ===================================================
   // JSX
@@ -504,459 +592,345 @@ const Students = () => {
 
   return (
     <AdminLayout title="Students">
+      <div className="w-full">
+        {/* MESSAGE */}
 
-      {/* =================================================
-          MESSAGE
-      ================================================= */}
+        {message.text && (
+          <div
+            role="alert"
+            className={`mb-6 flex items-center gap-3 rounded-xl border px-5 py-4 text-sm font-medium shadow-sm ${
+              message.type === "success"
+                ? "border-green-200 bg-green-50 text-green-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            <i className={`fa-solid ${message.type === "success" ? "fa-circle-check" : "fa-circle-exclamation"} text-xl mt-0.5`}></i>
+            <div>
+              <p className="font-semibold">{message.type === "success" ? "Success" : "Error"}</p>
+              <p className="text-sm mt-1">{message.text}</p>
+            </div>
+          </div>
+        )}
 
-      {message.text && (
+        {/* PAGE HEADER */}
+
         <div
-          className={`mb-5 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-sm ${
-            message.type === "success"
-              ? "border-green-200 bg-green-50 text-green-700"
-              : "border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          <span className="text-lg">
-            {message.type === "success"
-              ? "✅"
-              : "⚠️"}
-          </span>
-
-          {message.text}
-        </div>
-      )}
-
-      {/* =================================================
-          PAGE HEADER
-      ================================================= */}
-
-      <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h3 className="text-2xl font-bold text-gray-800">
-            Student Management
-          </h3>
-
-          <p className="mt-1 text-sm text-gray-500">
-            View, search, edit and manage your students.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => navigate("/students/add")}
           className="
-            flex items-center justify-center gap-2
-            rounded-xl
-            bg-[#075985]
-            px-5 py-3
-            text-sm font-semibold text-white
-            shadow-md
-            transition
-            hover:bg-[#064e73]
-            hover:shadow-lg
+            bg-gradient-to-r
+            from-[#198754]
+            to-[#146c43]
+            rounded-2xl
+            p-6 md:p-8
+            text-white
+            shadow-lg
+            mb-6
           "
         >
-          <span className="text-lg">➕</span>
-          Add New Student
-        </button>
-      </div>
-
-      {/* =================================================
-          STATS
-      ================================================= */}
-
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-
-        {/* TOTAL */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
+          <div
+            className="
+              flex
+              flex-col
+              md:flex-row
+              md:items-center
+              md:justify-between
+              gap-5
+            "
+          >
             <div>
-              <p className="text-sm font-medium text-gray-500">
-                Total Students
-              </p>
-
-              <h4 className="mt-2 text-3xl font-bold text-gray-800">
-                {students.length}
-              </h4>
-            </div>
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-2xl">
-              👨‍🎓
-            </div>
-          </div>
-        </div>
-
-        {/* MALE */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">
-                Male Students
-              </p>
-
-              <h4 className="mt-2 text-3xl font-bold text-gray-800">
-                {maleCount}
-              </h4>
-            </div>
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-2xl">
-              👨
-            </div>
-          </div>
-        </div>
-
-        {/* FEMALE */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">
-                Female Students
-              </p>
-
-              <h4 className="mt-2 text-3xl font-bold text-gray-800">
-                {femaleCount}
-              </h4>
-            </div>
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-pink-50 text-2xl">
-              👩
-            </div>
-          </div>
-        </div>
-
-        {/* COURSES */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">
-                Active Courses
-              </p>
-
-              <h4 className="mt-2 text-3xl font-bold text-gray-800">
-                {courseOptions.length}
-              </h4>
-            </div>
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-2xl">
-              📚
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* =================================================
-          STUDENT TABLE CARD
-      ================================================= */}
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-
-        {/* CARD HEADER */}
-
-        <div className="border-b border-gray-200 p-4 sm:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-            <div>
-              <h3 className="text-lg font-bold text-gray-800">
-                All Students
-              </h3>
-
-              <p className="mt-1 text-sm text-gray-500">
-                Showing{" "}
-                <span className="font-semibold text-gray-700">
-                  {filteredStudents.length}
-                </span>{" "}
-                of{" "}
-                <span className="font-semibold text-gray-700">
-                  {students.length}
-                </span>{" "}
-                students
-              </p>
-            </div>
-
-            {/* FILTERS */}
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-
-              {/* SEARCH */}
-
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  🔍
-                </span>
-
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) =>
-                    setSearchTerm(e.target.value)
-                  }
-                  placeholder="Search student..."
+              <div className="flex items-center gap-3 mb-2">
+                <div
                   className="
-                    w-full
+                    w-12 h-12
                     rounded-xl
-                    border border-gray-300
-                    bg-gray-50
-                    py-2.5
-                    pl-10
-                    pr-4
-                    text-sm
-                    outline-none
-                    transition
-                    focus:border-[#075985]
-                    focus:bg-white
-                    focus:ring-2
-                    focus:ring-[#075985]/10
-                    sm:w-64
+                    bg-white/20
+                    flex
+                    items-center
+                    justify-center
+                    text-2xl
                   "
-                />
+                >
+                  <i className="fa-solid fa-user-graduate text-white"></i>
+                </div>
+
+                <h1 className="text-2xl md:text-3xl font-bold">
+                  Student Management
+                </h1>
               </div>
 
-              {/* COURSE */}
+              <p className="text-green-100">
+                View, search, edit and manage your students with ease.
+              </p>
+            </div>
 
-              <select
-                value={courseFilter}
-                onChange={(e) =>
-                  setCourseFilter(e.target.value)
-                }
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={exportToExcel}
                 className="
+                  bg-white/15
+                  hover:bg-white/25
+                  text-white
+                  px-5 py-3
                   rounded-xl
-                  border border-gray-300
-                  bg-gray-50
-                  px-4
-                  py-2.5
-                  text-sm
-                  text-gray-700
-                  outline-none
-                  transition
-                  focus:border-[#075985]
-                  focus:bg-white
-                  focus:ring-2
-                  focus:ring-[#075985]/10
+                  font-semibold
+                  transition-all
+                  shadow-md
+                  flex
+                  items-center
+                  gap-2
+                  border border-white/20
                 "
               >
-                <option value="">
-                  All Courses
-                </option>
+                <i className="fa-solid fa-file-excel"></i>
+                Export Excel
+              </button>
 
-                {courseOptions.map((course) => (
-                  <option
-                    key={course}
-                    value={course}
-                  >
-                    {course}
-                  </option>
-                ))}
-              </select>
-
-              {/* RESET */}
-
-              {hasFilters && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="
-                    rounded-xl
-                    border border-gray-300
-                    px-4
-                    py-2.5
-                    text-sm
-                    font-medium
-                    text-gray-600
-                    transition
-                    hover:bg-gray-100
-                  "
-                >
-                  Reset
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => navigate("/students/add")}
+                className="
+                  bg-white
+                  text-[#198754]
+                  hover:bg-green-50
+                  px-5 py-3
+                  rounded-xl
+                  font-semibold
+                  transition-all
+                  shadow-md
+                  flex
+                  items-center
+                  gap-2
+                "
+              >
+                <i className="fa-solid fa-user-plus"></i>
+                Add New Student
+              </button>
             </div>
           </div>
         </div>
 
-        {/* =================================================
-            TABLE
-        ================================================= */}
+        {/* STATISTICS CARDS (CLICKABLE & HOVER GREEN) */}
 
-        <div className="overflow-x-auto">
+        <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          <div 
+            onClick={() => setCardFilter("")}
+            className={`bg-white p-6 rounded-2xl border transition-all duration-300 shadow-sm flex items-center gap-4 cursor-pointer hover:border-[#198754] hover:shadow-md hover:bg-green-50/20 group ${cardFilter === "" ? "border-[#198754] ring-2 ring-green-100" : "border-gray-100"}`}
+          >
+            <div className="w-12 h-12 rounded-xl bg-green-50 text-[#198754] group-hover:bg-[#198754] group-hover:text-white transition-colors duration-300 flex items-center justify-center text-xl">
+              <i className="fa-solid fa-users"></i>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Total Students</p>
+              <h3 className="text-2xl font-bold text-gray-800 mt-1">{students.length}</h3>
+            </div>
+          </div>
 
-          {/* LOADING */}
+          <div 
+            onClick={() => setCardFilter("male")}
+            className={`bg-white p-6 rounded-2xl border transition-all duration-300 shadow-sm flex items-center gap-4 cursor-pointer hover:border-[#198754] hover:shadow-md hover:bg-green-50/20 group ${cardFilter === "male" ? "border-[#198754] ring-2 ring-green-100" : "border-gray-100"}`}
+          >
+            <div className="w-12 h-12 rounded-xl bg-green-50 text-[#198754] group-hover:bg-[#198754] group-hover:text-white transition-colors duration-300 flex items-center justify-center text-xl">
+              <i className="fa-solid fa-mars"></i>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Male Students</p>
+              <h3 className="text-2xl font-bold text-gray-800 mt-1">{maleCount}</h3>
+            </div>
+          </div>
 
-          {loading ? (
-            <div className="flex min-h-[320px] items-center justify-center">
-              <div className="text-center">
-                <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-[#075985]" />
+          <div 
+            onClick={() => setCardFilter("female")}
+            className={`bg-white p-6 rounded-2xl border transition-all duration-300 shadow-sm flex items-center gap-4 cursor-pointer hover:border-[#198754] hover:shadow-md hover:bg-green-50/20 group ${cardFilter === "female" ? "border-[#198754] ring-2 ring-green-100" : "border-gray-100"}`}
+          >
+            <div className="w-12 h-12 rounded-xl bg-pink-50 text-pink-600 group-hover:bg-pink-600 group-hover:text-white transition-colors duration-300 flex items-center justify-center text-xl">
+              <i className="fa-solid fa-venus"></i>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Female Students</p>
+              <h3 className="text-2xl font-bold text-gray-800 mt-1">{femaleCount}</h3>
+            </div>
+          </div>
 
-                <p className="text-sm text-gray-500">
-                  Loading students...
+          <div 
+            onClick={() => setCardFilter("active")}
+            className={`bg-white p-6 rounded-2xl border transition-all duration-300 shadow-sm flex items-center gap-4 cursor-pointer hover:border-[#198754] hover:shadow-md hover:bg-green-50/20 group ${cardFilter === "active" ? "border-[#198754] ring-2 ring-green-100" : "border-gray-100"}`}
+          >
+            <div className="w-12 h-12 rounded-xl bg-green-50 text-[#198754] group-hover:bg-[#198754] group-hover:text-white transition-colors duration-300 flex items-center justify-center text-xl">
+              <i className="fa-solid fa-user-check"></i>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 font-medium">Active Students</p>
+              <h3 className="text-2xl font-bold text-gray-800 mt-1">{activeStudentsCount}</h3>
+            </div>
+          </div>
+        </div>
+
+        {/* ALL STUDENTS TABLE CONTAINER */}
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* CARD HEADER */}
+
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="font-bold text-xl text-gray-800">
+                  All Students List {cardFilter && <span className="text-sm font-normal text-[#198754] bg-green-50 px-3 py-1 rounded-full ml-2">Filtered by: {cardFilter.toUpperCase()}</span>}
+                </h3>
+
+                <p className="text-sm text-gray-500 mt-1">
+                  Showing{" "}
+                  <span className="font-semibold text-[#198754]">
+                    {filteredStudents.length}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-semibold text-gray-700">
+                    {students.length}
+                  </span>{" "}
+                  students
                 </p>
               </div>
-            </div>
 
-          ) : filteredStudents.length === 0 ? (
+              {/* FILTERS */}
 
-            /* EMPTY */
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <i className="fa-solid fa-search"></i>
+                  </span>
 
-            <div className="flex min-h-[350px] flex-col items-center justify-center px-5 text-center">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search student..."
+                    className={`${INPUT_CLASS} pl-11 sm:w-64`}
+                  />
+                </div>
 
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 text-4xl">
-                👨‍🎓
+                <select
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(e.target.value)}
+                  className={`${INPUT_CLASS} sm:w-auto`}
+                >
+                  <option value="">All Courses</option>
+
+                  {courseOptions.map((course) => (
+                    <option key={course} value={course}>
+                      {course}
+                    </option>
+                  ))}
+                </select>
+
+                {hasFilters && (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="px-5 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold transition-all text-sm"
+                  >
+                    Reset
+                  </button>
+                )}
               </div>
-
-              <h3 className="text-lg font-bold text-gray-800">
-                No Students Found
-              </h3>
-
-              <p className="mt-1 max-w-md text-sm text-gray-500">
-                {hasFilters
-                  ? "No student matches your current search or course filter."
-                  : "There are no students registered yet."}
-              </p>
-
-              {hasFilters ? (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="
-                    mt-4
-                    rounded-xl
-                    bg-gray-800
-                    px-5
-                    py-2.5
-                    text-sm
-                    font-semibold
-                    text-white
-                    hover:bg-gray-700
-                  "
-                >
-                  Clear Filters
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/students/add")
-                  }
-                  className="
-                    mt-4
-                    rounded-xl
-                    bg-[#075985]
-                    px-5
-                    py-2.5
-                    text-sm
-                    font-semibold
-                    text-white
-                    hover:bg-[#064e73]
-                  "
-                >
-                  Add First Student
-                </button>
-              )}
             </div>
+          </div>
 
-          ) : (
+          {/* TABLE */}
 
-            /* TABLE */
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="flex min-h-[320px] items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-green-100 border-t-[#198754]" />
 
-            <table className="min-w-[1750px] w-full">
+                  <p className="text-sm text-gray-500">
+                    Loading students...
+                  </p>
+                </div>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="flex min-h-[350px] flex-col items-center justify-center px-5 text-center">
+                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-50 text-3xl text-[#198754]">
+                  <i className="fa-solid fa-users-slash"></i>
+                </div>
 
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  No Students Found
+                </h3>
 
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    #
-                  </th>
+                <p className="mt-2 max-w-md text-sm text-gray-500">
+                  {hasFilters
+                    ? "No student matches your current search or course filter."
+                    : "There are no students registered yet."}
+                </p>
 
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Student
-                  </th>
+                {hasFilters ? (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className={`mt-4 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${GREEN_BUTTON}`}
+                  >
+                    Clear Filters
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/students/add")}
+                    className={`mt-4 rounded-xl px-5 py-2.5 text-sm font-semibold transition ${GREEN_BUTTON}`}
+                  >
+                    Add First Student
+                  </button>
+                )}
+              </div>
+            ) : (
+              <table className="w-full min-w-[1750px]">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    {[
+                      "#",
+                      "Student",
+                      "Father Name",
+                      "CNIC",
+                      "Qualification",
+                      "Domicile",
+                      "Phone",
+                      "Parent's Phone",
+                      "Gender",
+                      "Course",
+                      "Address",
+                      "Status",
+                      "Actions",
+                    ].map((heading) => (
+                      <th
+                        key={heading}
+                        className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-gray-600"
+                      >
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
 
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Father Name
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    CNIC
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Qualification
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Domicile
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Phone
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Parent's Phone
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Gender
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Course
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Address
-                  </th>
-
-                  <th className="px-5 py-4 text-center text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Status
-                  </th>
-
-                  <th className="px-5 py-4 text-center text-xs font-bold uppercase tracking-wide text-gray-500">
-                    Actions
-                  </th>
-
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-100">
-
-                {filteredStudents.map(
-                  (student, index) => (
+                <tbody className="divide-y divide-gray-100">
+                  {filteredStudents.map((student, index) => (
                     <tr
                       key={student.id}
-                      className="transition hover:bg-gray-50"
+                      className="group transition-colors duration-200 hover:bg-green-50/40"
                     >
-
                       {/* NUMBER */}
-
-                      <td className="px-5 py-4 text-sm font-medium text-gray-500">
+                      <td className="px-5 py-4 text-sm text-gray-500">
                         {index + 1}
                       </td>
 
                       {/* STUDENT */}
-
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-
                           {student.image ? (
                             <img
-                              src={getImageUrl(
-                                student.image
-                              )}
-                              alt={student.name}
-                              className="
-                                h-11
-                                w-11
-                                flex-shrink-0
-                                rounded-full
-                                border
-                                border-gray-200
-                                object-cover
-                              "
+                              src={getImageUrl(student.image)}
+                              alt={student.name || "Student"}
+                              className="h-11 w-11 shrink-0 rounded-full border border-gray-200 object-cover"
                               onError={(e) => {
-                                e.currentTarget.style.display =
-                                  "none";
-
+                                e.currentTarget.style.display = "none";
                                 e.currentTarget.nextElementSibling?.classList.remove(
                                   "hidden"
                                 );
@@ -966,219 +940,148 @@ const Students = () => {
 
                           <div
                             className={`${
-                              student.image
-                                ? "hidden"
-                                : ""
-                            }
-                            flex
-                            h-11
-                            w-11
-                            flex-shrink-0
-                            items-center
-                            justify-center
-                            rounded-full
-                            bg-[#075985]
-                            text-sm
-                            font-bold
-                            text-white`}
+                              student.image ? "hidden" : ""
+                            } flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#198754] text-sm font-bold text-white`}
                           >
-                            {getInitials(
-                              student.name
-                            )}
+                            {getInitials(student.name)}
                           </div>
 
                           <div className="min-w-0">
-
-                            <p className="truncate font-semibold text-gray-800">
-                              {student.name ||
-                                "Unnamed Student"}
+                            <p className="truncate font-semibold text-gray-800 group-hover:text-[#198754]">
+                              {student.name || "Unnamed Student"}
                             </p>
 
                             <p className="mt-0.5 max-w-[220px] truncate text-xs text-gray-500">
-                              {student.email ||
-                                "No email"}
+                              {student.email || "No email"}
                             </p>
-
                           </div>
                         </div>
                       </td>
-
-                      {/* FATHER */}
 
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {student.fatherName || "-"}
                       </td>
 
-                      {/* CNIC */}
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {student.cnic || "-"}
                       </td>
 
-                      {/* QUALIFICATION */}
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {student.qualification || "-"}
                       </td>
 
-                      {/* DOMICILE */}
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {student.domicile || "-"}
                       </td>
-
-                      {/* PHONE */}
 
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {student.phone || "-"}
                       </td>
 
-                      {/* PARENT PHONE */}
                       <td className="px-5 py-4 text-sm text-gray-600">
                         {student.parentPhone || "-"}
                       </td>
 
                       {/* GENDER */}
-
                       <td className="px-5 py-4">
-
                         {student.gender ? (
                           <span
                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              String(
-                                student.gender
-                              ).toLowerCase() === "male"
-                                ? "bg-blue-50 text-blue-700"
+                              String(student.gender).toLowerCase() === "male"
+                                ? "bg-green-50 text-[#198754]"
                                 : "bg-pink-50 text-pink-700"
                             }`}
                           >
                             {student.gender}
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-400">
-                            -
-                          </span>
+                          <span className="text-sm text-gray-400">-</span>
                         )}
-
                       </td>
 
                       {/* COURSE */}
-
                       <td className="px-5 py-4">
-
                         {student.course ? (
-                          <span className="inline-flex max-w-[180px] truncate rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                          <span className="inline-flex max-w-[180px] truncate rounded-lg bg-green-50 px-3 py-1.5 text-xs font-semibold text-[#198754]">
                             {student.course}
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-400">
-                            -
-                          </span>
+                          <span className="text-sm text-gray-400">-</span>
                         )}
-
                       </td>
 
                       {/* ADDRESS */}
-
                       <td className="max-w-[220px] px-5 py-4">
-
                         <p
                           className="truncate text-sm text-gray-600"
                           title={student.address || ""}
                         >
                           {student.address || "-"}
                         </p>
-
                       </td>
 
-                      {/* STATUS BADGE AND TOGGLE */}
+                      {/* STATUS */}
                       <td className="px-5 py-4 text-center">
                         <div className="flex flex-col items-center gap-2">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                            (student.status || "Active") === "Active"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}>
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                              (student.status || "Active") === "Active"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
                             {student.status || "Active"}
                           </span>
+
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(student)}
-                            title={student.status === "De-Active" ? "Activate student" : "Deactivate student"}
+                            title={
+                              student.status === "De-Active"
+                                ? "Activate student"
+                                : "Deactivate student"
+                            }
                             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                               student.status === "De-Active"
                                 ? "bg-green-50 text-green-700 hover:bg-green-100"
                                 : "bg-red-50 text-red-700 hover:bg-red-100"
                             }`}
                           >
-                            {student.status === "De-Active" ? "Set Active" : "Set De-Active"}
+                            {student.status === "De-Active"
+                              ? "Set Active"
+                              : "Set De-Active"}
                           </button>
                         </div>
                       </td>
 
                       {/* ACTIONS */}
-
                       <td className="px-5 py-4">
-
                         <div className="flex items-center justify-center gap-2">
-
-                          {/* EDIT */}
-
                           <button
                             type="button"
-                            onClick={() =>
-                              openEditModal(student)
-                            }
+                            onClick={() => openEditModal(student)}
                             title="Edit Student"
-                            className="
-                              flex
-                              h-9
-                              w-9
-                              items-center
-                              justify-center
-                              rounded-lg
-                              bg-blue-50
-                              text-blue-600
-                              transition
-                              hover:bg-blue-100
-                            "
+                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-[#198754] transition hover:bg-[#198754] hover:text-white"
                           >
-                            ✏️
+                            <i className="fa-solid fa-pen-to-square"></i>
                           </button>
-
-                          {/* DELETE */}
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleDeleteStudent(
-                                student.id
-                              )
-                            }
+                            onClick={() => handleDeleteStudent(student.id)}
                             title="Delete Student"
-                            className="
-                              flex
-                              h-9
-                              w-9
-                              items-center
-                              justify-center
-                              rounded-lg
-                              bg-red-50
-                              text-red-600
-                              transition
-                              hover:bg-red-100
-                            "
+                            className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-600 hover:text-white"
                           >
-                            🗑️
+                            <i className="fa-solid fa-trash"></i>
                           </button>
-
                         </div>
                       </td>
-
                     </tr>
-                  )
-                )}
-
-              </tbody>
-            </table>
-          )}
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1187,20 +1090,14 @@ const Students = () => {
       ================================================= */}
 
       {editingStudent && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
-
-          <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
             {/* MODAL HEADER */}
 
-            <div className="flex items-center justify-between bg-[#075985] px-5 py-4 text-white sm:px-6">
-
+            <div className="flex items-center justify-between bg-gradient-to-r from-[#198754] to-[#146c43] px-6 py-5 text-white">
               <div>
-                <h3 className="text-lg font-bold">
-                  Edit Student
-                </h3>
-
-                <p className="mt-0.5 text-xs text-blue-100">
+                <h3 className="text-lg font-bold">Edit Student</h3>
+                <p className="mt-1 text-xs text-green-100">
                   Update student information
                 </p>
               </div>
@@ -1209,214 +1106,129 @@ const Students = () => {
                 type="button"
                 onClick={closeEditModal}
                 disabled={updating}
-                className="
-                  flex
-                  h-9
-                  w-9
-                  items-center
-                  justify-center
-                  rounded-lg
-                  bg-white/10
-                  text-xl
-                  hover:bg-white/20
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xl transition hover:bg-white/20 disabled:opacity-50"
               >
-                ×
+                ✕
               </button>
-
             </div>
 
             {/* FORM */}
 
-            <form
-              onSubmit={handleUpdateStudent}
-              className="p-5 sm:p-6"
-            >
-
+            <form onSubmit={handleUpdateStudent} className="p-6 md:p-8">
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-                {/* NAME */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Student Name *
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Student Name <span className="text-red-500">*</span>
                   </label>
-
                   <input
                     type="text"
                     name="name"
                     value={editForm.name}
                     onChange={handleEditChange}
                     placeholder="Enter student name"
-                    className="
-                      w-full
-                      rounded-xl
-                      border border-gray-300
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
+                    required
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* FATHER */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Father Name
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Father Name <span className="text-red-500">*</span>
                   </label>
-
                   <input
                     type="text"
                     name="fatherName"
                     value={editForm.fatherName}
                     onChange={handleEditChange}
                     placeholder="Enter father name"
-                    className="
-                      w-full
-                      rounded-xl
-                      border border-gray-300
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* CNIC */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">CNIC Number</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">CNIC Number</label>
                   <input
                     type="text"
                     name="cnic"
                     value={editForm.cnic}
                     onChange={handleEditChange}
-                    maxLength={15}
                     placeholder="e.g. 42101-1234567-1"
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#075985] focus:ring-2 focus:ring-[#075985]/10"
+                    maxLength={15}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* QUALIFICATION */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">Qualification</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Qualification</label>
                   <input
                     type="text"
                     name="qualification"
                     value={editForm.qualification}
                     onChange={handleEditChange}
                     placeholder="e.g. Matric, Intermediate"
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#075985] focus:ring-2 focus:ring-[#075985]/10"
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* DOMICILE */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">Domicile</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Domicile</label>
                   <input
                     type="text"
                     name="domicile"
                     value={editForm.domicile}
                     onChange={handleEditChange}
                     placeholder="e.g. Hyderabad, Sindh"
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#075985] focus:ring-2 focus:ring-[#075985]/10"
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* EMAIL */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Email
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email <span className="text-red-500">*</span>
                   </label>
-
                   <input
                     type="email"
                     name="email"
                     value={editForm.email}
                     onChange={handleEditChange}
-                    placeholder="Enter email"
-                    className="
-                      w-full
-                      rounded-xl
-                      border border-gray-300
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
+                    placeholder="Enter email address"
+                    required
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* PASSWORD: OPTIONAL CHANGE */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    New Password (optional)
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Password (leave blank to keep current)
                   </label>
                   <input
                     type="password"
                     name="password"
                     value={editForm.password}
                     onChange={handleEditChange}
-                    placeholder="Leave blank to keep current password"
-                    autoComplete="new-password"
+                    placeholder="At least 8 characters"
                     minLength={8}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#075985] focus:ring-2 focus:ring-[#075985]/10"
+                    className={INPUT_CLASS}
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Enter at least 8 characters only if you want to change it.
-                  </p>
                 </div>
 
-                {/* PHONE */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Phone
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Phone Number <span className="text-red-500">*</span>
                   </label>
-
                   <input
-                    type="text"
+                    type="tel"
                     name="phone"
                     value={editForm.phone}
                     onChange={handleEditChange}
                     placeholder="Enter phone number"
-                    className="
-                      w-full
-                      rounded-xl
-                      border border-gray-300
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
+                    required
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* PARENT PHONE */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Parent's Phone Number
                   </label>
                   <input
@@ -1425,257 +1237,100 @@ const Students = () => {
                     value={editForm.parentPhone}
                     onChange={handleEditChange}
                     placeholder="Enter parent's phone number"
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#075985] focus:ring-2 focus:ring-[#075985]/10"
+                    className={INPUT_CLASS}
                   />
                 </div>
 
-                {/* GENDER */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Gender
-                  </label>
-
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Gender</label>
                   <select
                     name="gender"
                     value={editForm.gender}
                     onChange={handleEditChange}
-                    className="
-                      w-full
-                      rounded-xl
-                      border border-gray-300
-                      bg-white
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
+                    className={INPUT_CLASS}
                   >
-                    <option value="">
-                      Select Gender
-                    </option>
-
-                    <option value="Male">
-                      Male
-                    </option>
-
-                    <option value="Female">
-                      Female
-                    </option>
-
-                    <option value="Other">
-                      Other
-                    </option>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
-                {/* COURSE */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Course
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Course <span className="text-red-500">*</span>
                   </label>
-
-                  <input
-                    type="text"
+                  <select
                     name="course"
                     value={editForm.course}
                     onChange={handleEditChange}
-                    placeholder="Enter course"
-                    className="
-                      w-full
-                      rounded-xl
-                      border border-gray-300
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
-                  />
+                    required
+                    className={INPUT_CLASS}
+                  >
+                    <option value="">Select Course</option>
+                    {courseOptions.map((course) => (
+                      <option key={course} value={course}>
+                        {course}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* STATUS: READ-ONLY CURRENT STATUS */}
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Current Student Status
-                  </label>
-                  <div className="flex min-h-[46px] items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${
-                        editForm.status === "Active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {editForm.status === "Active" ? "Active" : "De-Active"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    Change student status using the status button in the Students list.
-                  </p>
-                </div>
-
-                {/* ADDRESS */}
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Address
-                  </label>
-
-                  <textarea
-                    name="address"
-                    value={editForm.address}
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Student Status</label>
+                  <select
+                    name="status"
+                    value={editForm.status}
                     onChange={handleEditChange}
-                    rows="3"
-                    placeholder="Enter student address"
-                    className="
-                      w-full
-                      resize-none
-                      rounded-xl
-                      border border-gray-300
-                      px-4
-                      py-3
-                      text-sm
-                      outline-none
-                      transition
-                      focus:border-[#075985]
-                      focus:ring-2
-                      focus:ring-[#075985]/10
-                    "
-                  />
+                    className={INPUT_CLASS}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="De-Active">De-Active</option>
+                  </select>
                 </div>
-
-                {/* IMAGE */}
-
-                <div className="md:col-span-2">
-
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Student Image
-                  </label>
-
-                  <div className="
-                    flex
-                    flex-col
-                    gap-4
-                    rounded-xl
-                    border
-                    border-dashed
-                    border-gray-300
-                    bg-gray-50
-                    p-4
-                    sm:flex-row
-                    sm:items-center
-                  ">
-
-                    {/* PREVIEW */}
-
-                    {editImagePreview ? (
-                      <img
-                        src={editImagePreview}
-                        alt="Student Preview"
-                        className="
-                          h-24
-                          w-24
-                          rounded-xl
-                          border
-                          border-gray-200
-                          object-cover
-                        "
-                        onError={(e) => {
-                          e.currentTarget.style.display =
-                            "none";
-                        }}
-                      />
-                    ) : (
-                      <div className="
-                        flex
-                        h-24
-                        w-24
-                        items-center
-                        justify-center
-                        rounded-xl
-                        bg-gray-200
-                        text-3xl
-                      ">
-                        👤
-                      </div>
-                    )}
-
-                    <div className="flex-1">
-
-                      <input
-                        type="file"
-                        name="image"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        onChange={handleEditChange}
-                        className="
-                          w-full
-                          text-sm
-                          text-gray-600
-                          file:mr-4
-                          file:rounded-lg
-                          file:border-0
-                          file:bg-[#075985]
-                          file:px-4
-                          file:py-2
-                          file:text-sm
-                          file:font-semibold
-                          file:text-white
-                          hover:file:bg-[#064e73]
-                        "
-                      />
-
-                      <p className="mt-2 text-xs text-gray-500">
-                        JPG, JPEG, PNG or WEBP.
-                        Maximum size: 5MB.
-                      </p>
-
-                    </div>
-                  </div>
-                </div>
-
               </div>
 
-              {/* BUTTONS */}
+              {/* ADDRESS */}
+              <div className="mt-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Address</label>
+                <textarea
+                  name="address"
+                  value={editForm.address}
+                  onChange={handleEditChange}
+                  placeholder="Enter student address"
+                  rows="3"
+                  className={`${INPUT_CLASS} resize-none`}
+                />
+              </div>
 
-              <div className="
-                mt-6
-                flex
-                flex-col-reverse
-                gap-3
-                border-t
-                border-gray-200
-                pt-5
-                sm:flex-row
-                sm:justify-end
-              ">
+              {/* IMAGE UPLOAD */}
+              <div className="mt-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Update Student Photo</label>
+                <div className="flex items-center gap-4">
+                  {editImagePreview && (
+                    <img
+                      src={editImagePreview}
+                      alt="Preview"
+                      className="w-14 h-14 rounded-xl object-cover border border-gray-200"
+                    />
+                  )}
+                  <input
+                    type="file"
+                    name="image"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleEditChange}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-[#198754] hover:file:bg-green-100 cursor-pointer"
+                  />
+                </div>
+              </div>
 
+              {/* MODAL BUTTONS */}
+              <div className="mt-8 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeEditModal}
                   disabled={updating}
-                  className="
-                    rounded-xl
-                    border
-                    border-gray-300
-                    px-5
-                    py-3
-                    text-sm
-                    font-semibold
-                    text-gray-700
-                    transition
-                    hover:bg-gray-100
-                    disabled:cursor-not-allowed
-                    disabled:opacity-50
-                  "
+                  className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold transition-all text-sm"
                 >
                   Cancel
                 </button>
@@ -1683,34 +1338,15 @@ const Students = () => {
                 <button
                   type="submit"
                   disabled={updating}
-                  className="
-                    rounded-xl
-                    bg-[#075985]
-                    px-6
-                    py-3
-                    text-sm
-                    font-semibold
-                    text-white
-                    shadow-sm
-                    transition
-                    hover:bg-[#064e73]
-                    hover:shadow-md
-                    disabled:cursor-not-allowed
-                    disabled:opacity-60
-                  "
+                  className={`px-6 py-3 rounded-xl text-white font-semibold transition-all text-sm shadow-md ${GREEN_BUTTON} disabled:opacity-50`}
                 >
-                  {updating
-                    ? "⏳ Updating..."
-                    : "💾 Save Changes"}
+                  {updating ? "Updating..." : "Save Changes"}
                 </button>
-
               </div>
-
             </form>
           </div>
         </div>
       )}
-
     </AdminLayout>
   );
 };

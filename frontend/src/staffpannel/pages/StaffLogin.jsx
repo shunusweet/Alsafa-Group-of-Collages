@@ -13,6 +13,7 @@ export default function StaffLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
     setLoading(true);
 
@@ -24,16 +25,14 @@ export default function StaffLogin() {
 
       const { token, staff } = response.data;
 
-      if (!token || !staff) {
-        throw new Error("Login response is incomplete.");
-      }
+    if (!token || !staff) {
+      throw new Error("Login response is incomplete.");
+    }
 
-      localStorage.setItem("staffToken", token);
-      localStorage.setItem("staffUser", JSON.stringify(staff));
+    localStorage.setItem("staffToken", token);
+    localStorage.setItem("staffUser", JSON.stringify(staff));
 
-      navigate("/staffpannel/dashboard", {
-        replace: true,
-      });
+    navigate("/staff/dashboard", { replace: true });
     } catch (err) {
       setError(
         err.response?.data?.message ||

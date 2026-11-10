@@ -85,7 +85,7 @@ const StudentLogin = () => {
                 <div className="bg-gradient-to-r from-[#075985] to-blue-700 px-6 py-9 text-center text-white">
 
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/15 text-3xl shadow-lg">
-                        🎓
+                        
                     </div>
 
                     <h1 className="text-2xl font-extrabold tracking-tight">
@@ -111,7 +111,7 @@ const StudentLogin = () => {
                             className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700"
                         >
                             <div className="flex items-start gap-2">
-                                <span className="text-base">⚠️</span>
+                                <span className="text-base"></span>
                                 <p>{error}</p>
                             </div>
                         </div>
